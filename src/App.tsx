@@ -2,6 +2,39 @@ import { useState, useEffect } from 'react';
 import { getMockExam } from './mockData';
 import type { ExamDraft, GradeLevel, RatioValues, TypeRatioValues } from './types';
 
+// Helper to render textbook-style vertical fractions automatically from horizontal notation (e.g. 2/7)
+function renderMathText(text: string | undefined) {
+  if (!text) return '';
+
+  const fractionRegex = /(\d+)\/(\d+)/g;
+  const parts = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = fractionRegex.exec(text)) !== null) {
+    const matchIndex = match.index;
+    if (matchIndex > lastIndex) {
+      parts.push(text.substring(lastIndex, matchIndex));
+    }
+    const numerator = match[1];
+    const denominator = match[2];
+    parts.push(
+      <span key={matchIndex} className="fraction">
+        <span className="numerator">{numerator}</span>
+        <span className="denominator">{denominator}</span>
+      </span>
+    );
+    lastIndex = fractionRegex.lastIndex;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(text.substring(lastIndex));
+  }
+
+  return parts.length > 0 ? parts : text;
+}
+
+
 function App() {
   // --- Form States (Default to Elementary Fractional Arithmetic) ---
   const [gradeLevel, setGradeLevel] = useState<GradeLevel>('elementary');
@@ -618,7 +651,7 @@ function App() {
             )}
 
             {!isGenerating && generatedExam && (
-              <article className="exam-worksheet">
+              <article className={`exam-worksheet ${viewMode === 'student' ? 'student-view' : 'teacher-view'}`}>
                 
                 {/* Meta Paper Title */}
                 <div className="exam-meta-header">
@@ -667,7 +700,7 @@ function App() {
                 <div className="objective-card">
                   <div className="objective-title">🎯 평가 목표 및 의도</div>
                   <p className="objective-text">
-                    {generatedExam.objective}
+                    {renderMathText(generatedExam.objective)}
                   </p>
                 </div>
 
@@ -684,7 +717,7 @@ function App() {
                         <div className="question-text-row">
                           <span className="question-number">{q.number}.</span>
                           <div className="question-body-content">
-                            {q.question} 
+                            {renderMathText(q.question)} 
                             <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: '0.5rem' }}>
                               [{typeKo} | 난이도 {diffKo}]
                             </span>
@@ -697,7 +730,7 @@ function App() {
                             {q.options.map((option, idx) => (
                               <div key={idx} className="option-item">
                                 <span style={{ fontWeight: 600, marginRight: '0.2rem' }}>{['①', '②', '③', '④', '⑤'][idx]}</span>
-                                <span>{option}</span>
+                                <span>{renderMathText(option)}</span>
                               </div>
                             ))}
                           </div>
@@ -717,21 +750,21 @@ function App() {
                               <span>🔑 올바른 모범 정답</span>
                             </div>
                             <div className="solution-body" style={{ fontWeight: 700, color: 'var(--color-easy)' }}>
-                              {q.answer}
+                              {renderMathText(q.answer)}
                             </div>
 
                             <div className="solution-header solution">
                               <span>💡 풀이 과정 및 해설</span>
                             </div>
                             <div className="solution-body">
-                              {q.solution}
+                              {renderMathText(q.solution)}
                             </div>
 
                             <div className="solution-header misconception">
                               <span>⚠️ 학생 예상 오개념 분석 & 피드백 방향</span>
                             </div>
                             <div className="solution-body" style={{ backgroundColor: 'var(--color-misconception-bg)', color: 'var(--color-misconception)', borderTop: '1px dashed var(--color-misconception-border)' }}>
-                              {q.expectedMisconception}
+                              {renderMathText(q.expectedMisconception)}
                             </div>
                           </div>
                         )}
@@ -767,7 +800,7 @@ function App() {
                                   {q.difficulty === 'easy' ? '쉬움' : q.difficulty === 'medium' ? '보통' : '어려움'}
                                 </span>
                               </td>
-                              <td className="correct">{q.answer}</td>
+                              <td className="correct">{renderMathText(q.answer)}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -777,7 +810,7 @@ function App() {
                     <div className="teacher-memo-card">
                       <h4 className="teacher-memo-title">🧠 교육학 전문가의 평가 설계 리뷰</h4>
                       <p className="teacher-memo-text">
-                        {generatedExam.teacherMemo}
+                        {renderMathText(generatedExam.teacherMemo)}
                       </p>
                     </div>
                   </>

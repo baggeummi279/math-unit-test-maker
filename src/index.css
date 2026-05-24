@@ -1067,3 +1067,46 @@ body {
 .exam-worksheet-wrapper::-webkit-scrollbar-thumb:hover {
   background-color: var(--text-muted);
 }
+
+/* ==========================================
+   Textbook Style Vertical Fractions
+   ========================================== */
+.fraction {
+  display: inline-flex;
+  flex-direction: column;
+  vertical-align: middle;
+  text-align: center;
+  font-size: 0.9em;
+  padding: 0 0.15em;
+  line-height: 1.0;
+  margin: 0 0.15em;
+}
+
+.fraction .numerator {
+  border-bottom: 1.5px solid var(--text-primary);
+  padding-bottom: 0.05rem;
+  display: block;
+}
+
+.fraction .denominator {
+  display: block;
+  padding-top: 0.05rem;
+}
+
+/* ==========================================
+   Fail-safe Student View Hiding Rules
+   ========================================== */
+.student-view .teacher-solution-card,
+.student-view .teacher-answer-grid-card,
+.student-view .teacher-memo-card {
+  display: none !important;
+}
+
+@media print {
+  .student-view .teacher-solution-card,
+  .student-view .teacher-answer-grid-card,
+  .student-view .teacher-memo-card {
+    display: none !important;
+  }
+}
+
