@@ -1,122 +1,804 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { useState, useEffect } from 'react';
+import { getMockExam } from './mockData';
+import type { ExamDraft, GradeLevel, RatioValues, TypeRatioValues } from './types';
 
 function App() {
-  const [count, setCount] = useState(0)
+  // --- Form States (Default to Elementary Fractional Arithmetic) ---
+  const [gradeLevel, setGradeLevel] = useState<GradeLevel>('elementary');
+  const [unitName, setUnitName] = useState('분수의 덧셈과 뺄셈');
+  const [concepts, setConcepts] = useState('동분모 분수의 덧셈, 대분수 변환, 받아올림');
+  const [standard, setStandard] = useState('[4수01-16] 분모가 같은 분수의 덧셈과 뺄셈의 계산 원리를 이해하고 그 계산을 할 수 있다.');
+  const [questionCount, setQuestionCount] = useState<5 | 10>(5);
+  
+  // Difficulty ratios (easy, medium, hard) - default 30% / 40% / 30%
+  const [difficulty, setDifficulty] = useState<RatioValues>({
+    easy: 30,
+    medium: 40,
+    hard: 30
+  });
+
+  // Question Type ratios (choice, short, essay) - default 40% / 40% / 20%
+  const [questionTypeRatio, setQuestionTypeRatio] = useState<TypeRatioValues>({
+    choice: 40,
+    short: 40,
+    essay: 20
+  });
+
+  const [purpose, setPurpose] = useState('형성평가 및 기초 개념 확인');
+
+  // --- UI/UX States ---
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [loadingStep, setLoadingStep] = useState(0);
+  const [generatedExam, setGeneratedExam] = useState<ExamDraft | null>(null);
+  const [viewMode, setViewMode] = useState<'student' | 'teacher'>('teacher');
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+
+  // Student specific inputs inside the worksheet (interactive for mock feel!)
+  const [studentGrade, setStudentGrade] = useState('');
+  const [studentNum, setStudentNum] = useState('');
+  const [studentName, setStudentName] = useState('');
+
+  // --- Validation ---
+  const difficultySum = difficulty.easy + difficulty.medium + difficulty.hard;
+  const typeSum = questionTypeRatio.choice + questionTypeRatio.short + questionTypeRatio.essay;
+  
+  const isDifficultyValid = difficultySum === 100;
+  const isTypeValid = typeSum === 100;
+  const canGenerate = isDifficultyValid && isTypeValid && !isGenerating;
+
+  // Auto-fill templates when GradeLevel changes synchronously in the event handler to avoid cascading renders
+  const handleGradeChange = (level: GradeLevel) => {
+    setGradeLevel(level);
+    if (level === 'elementary') {
+      setUnitName('분수의 덧셈과 뺄셈');
+      setConcepts('동분모 분수의 덧셈, 대분수 변환, 받아올림');
+      setStandard('[4수01-16] 분모가 같은 분수의 덧셈과 뺄셈의 계산 원리를 이해하고 그 계산을 할 수 있다.');
+      setPurpose('형성평가 및 기초 개념 확인');
+    } else if (level === 'middle') {
+      setUnitName('소인수분해');
+      setConcepts('소인수, 약수의 개수, 최대공약수, 서로소');
+      setStandard('[9수01-01] 소인수분해의 뜻을 알고, 자연수를 소인수분해할 수 있다.');
+      setPurpose('학기 초 진단평가 및 오개념 진정성 파악');
+    } else {
+      setUnitName('다항식의 연산과 나머지정리');
+      setConcepts('다항식의 전개, 곱셈 공식의 변형, 나머지 정리 증명, 3차식 나눗셈');
+      setStandard('[10수01-02] 나머지정리의 의미를 이해하고, 이를 활용하여 문제를 해결할 수 있다.');
+      setPurpose('중간고사 대비 심화 성취평가');
+    }
+  };
+
+  // Handle auto-balancing ratios
+  const handleAutoBalanceDifficulty = () => {
+    setDifficulty({ easy: 30, medium: 40, hard: 30 });
+  };
+
+  const handleAutoBalanceTypes = () => {
+    setQuestionTypeRatio({ choice: 40, short: 40, essay: 20 });
+  };
+
+  // --- Simulated Generation Logic ---
+  const handleGenerate = () => {
+    if (!canGenerate) return;
+    
+    setIsGenerating(true);
+    setLoadingStep(0);
+
+    const steps = [
+      '교육과정 성취기준 및 단원 핵심요소 분석 중...',
+      '교수평가 오개념 빅데이터 대조 및 문제설계 중...',
+      '난이도/유형 비율 기반 맞춤 수학 문항 생성 중...',
+      '교사용 정답표, 상세 해설 및 지도안 설계 작성 중...'
+    ];
+
+    let currentStep = 0;
+    const interval = setInterval(() => {
+      currentStep++;
+      if (currentStep < steps.length) {
+        setLoadingStep(currentStep);
+      } else {
+        clearInterval(interval);
+        // Match mock data based on input parameters
+        const exam = getMockExam({
+          gradeLevel,
+          unitName,
+          concepts,
+          standard,
+          questionCount,
+          difficulty,
+          questionTypeRatio,
+          purpose
+        });
+        setGeneratedExam(exam);
+        setIsGenerating(false);
+        triggerToast('✨ 단원평가 초안이 성공적으로 생성되었습니다!');
+      }
+    }, 600);
+  };
+
+  // --- Toast Trigger ---
+  const triggerToast = (msg: string) => {
+    setToastMessage(msg);
+    setShowToast(true);
+  };
+
+  useEffect(() => {
+    if (showToast) {
+      const timer = setTimeout(() => setShowToast(false), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [showToast]);
+
+  // --- Copy to Clipboard Formatting ---
+  const handleCopyText = () => {
+    if (!generatedExam) return;
+
+    let text = `=========================================\n`;
+    text += `   수학 단원평가 초안 - [${generatedExam.title}]\n`;
+    text += `=========================================\n\n`;
+    text += `■ 학년/대상: ${generatedExam.gradeText}\n`;
+    text += `■ 평가 단원: ${generatedExam.unitName}\n`;
+    text += `■ 평가 목적: ${generatedExam.purpose}\n`;
+    text += `■ 평가 목표: ${generatedExam.objective}\n\n`;
+
+    if (viewMode === 'student') {
+      text += `-----------------------------------------\n`;
+      text += `              [ 학 생 용  문 제 지 ]\n`;
+      text += `-----------------------------------------\n`;
+      text += ` 학년: ______  반: ______  번호: ______  이름: ______\n\n`;
+
+      generatedExam.questions.forEach((q) => {
+        text += `${q.number}번. [${q.type === 'choice' ? '객관식' : q.type === 'short' ? '단답형' : '서술형'}] (난이도: ${q.difficulty === 'easy' ? '쉬움' : q.difficulty === 'medium' ? '보통' : '어려움'})\n`;
+        text += `질문: ${q.question}\n`;
+        if (q.options && q.options.length > 0) {
+          q.options.forEach((opt, idx) => {
+            text += `  ${idx + 1}) ${opt}\n`;
+          });
+        }
+        text += `\n[답안 기재란]: _____________________________________\n\n`;
+      });
+    } else {
+      text += `-----------------------------------------\n`;
+      text += `              [ 교 사 용  정 답 지 ]\n`;
+      text += `-----------------------------------------\n\n`;
+
+      generatedExam.questions.forEach((q) => {
+        text += `${q.number}번. [${q.type === 'choice' ? '객관식' : q.type === 'short' ? '단답형' : '서술형'}] (난이도: ${q.difficulty === 'easy' ? '쉬움' : q.difficulty === 'medium' ? '보통' : '어려움'})\n`;
+        text += `질문: ${q.question}\n`;
+        if (q.options && q.options.length > 0) {
+          q.options.forEach((opt, idx) => {
+            text += `  ${idx + 1}) ${opt}\n`;
+          });
+        }
+        text += `▶ [정답]: ${q.answer}\n`;
+        text += `▶ [해설]:\n${q.solution}\n`;
+        text += `▶ [예상 오개념 분석]:\n${q.expectedMisconception}\n`;
+        text += `-----------------------------------------\n\n`;
+      });
+
+      text += `-----------------------------------------\n`;
+      text += `            [ 문항별 정답 요약표 ]\n`;
+      text += `-----------------------------------------\n`;
+      text += `문항번호 |  문항유형  |  난이도  |  정답\n`;
+      generatedExam.questions.forEach((q) => {
+        const typeKo = q.type === 'choice' ? '객관식' : q.type === 'short' ? '단답형' : '서술형';
+        const diffKo = q.difficulty === 'easy' ? '쉬움' : q.difficulty === 'medium' ? '보통' : '어려움';
+        text += `  ${String(q.number).padEnd(6)} |  ${typeKo.padEnd(6)} |  ${diffKo.padEnd(5)} |  ${q.answer}\n`;
+      });
+      text += `\n`;
+      text += `-----------------------------------------\n`;
+      text += `            [ 교사용 종합 검토 메모 ]\n`;
+      text += `-----------------------------------------\n`;
+      text += generatedExam.teacherMemo + `\n`;
+    }
+
+    navigator.clipboard.writeText(text)
+      .then(() => {
+        triggerToast('📋 시험지가 클립보드에 복사되었습니다! (외부 문서에 붙여넣기 하세요)');
+      })
+      .catch(() => {
+        triggerToast('❌ 복사에 실패했습니다. 수동으로 복사해주세요.');
+      });
+  };
+
+  // --- Print Handler ---
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const stepsText = [
+    '교육과정 성취기준 및 단원 핵심요소 분석 중...',
+    '교수평가 오개념 빅데이터 대조 및 문제설계 중...',
+    '난이도/유형 비율 기반 맞춤 수학 문항 생성 중...',
+    '교사용 정답표, 상세 해설 및 지도안 설계 작성 중...'
+  ];
 
   return (
     <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
+      {/* Header */}
+      <header className="app-header">
+        <div className="app-logo">
+          <div className="app-logo-icon">f(x)</div>
+          <h1 className="app-logo-text">수학 단원평가 제작소</h1>
         </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+        <p className="app-description">
+          수학 교육과정 성취기준과 오개념 빅데이터에 근거하여, 교사 및 예비교사를 위한 최적의 수학 단원평가 문항과 교수학습 처방 해설지를 맞춤 설계해 드립니다.
+        </p>
+      </header>
 
-      <div className="ticks"></div>
+      {/* Main Content Area */}
+      <main className="app-container">
+        
+        {/* Left Side: Input Panel */}
+        <section className="panel">
+          <div className="form-title-bar">
+            <span style={{ fontSize: '1.2rem' }}>⚙️</span> 단원평가 출제 조건 설정
+          </div>
+          
+          <div className="form-body">
+            
+            {/* Academic Grade select */}
+            <div className="form-group">
+              <label className="form-label">
+                학교급 선택 <span className="form-label-help">* 필수 선택</span>
+              </label>
+              <div className="grade-pills">
+                <button
+                  type="button"
+                  className={`grade-pill-btn ${gradeLevel === 'elementary' ? 'active' : ''}`}
+                  onClick={() => handleGradeChange('elementary')}
+                >
+                  🏫 초등학교
+                </button>
+                <button
+                  type="button"
+                  className={`grade-pill-btn ${gradeLevel === 'middle' ? 'active' : ''}`}
+                  onClick={() => handleGradeChange('middle')}
+                >
+                  🏢 중학교
+                </button>
+                <button
+                  type="button"
+                  className={`grade-pill-btn ${gradeLevel === 'high' ? 'active' : ''}`}
+                  onClick={() => handleGradeChange('high')}
+                >
+                  🏛️ 고등학교
+                </button>
+              </div>
+            </div>
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+            {/* Target Unit Name */}
+            <div className="form-group">
+              <label className="form-label" htmlFor="unit-input">
+                평가 단원 입력
+              </label>
+              <input
+                id="unit-input"
+                type="text"
+                className="input-text"
+                placeholder="예: 분수의 덧셈과 뺄셈, 일차방정식"
+                value={unitName}
+                onChange={(e) => setUnitName(e.target.value)}
+              />
+            </div>
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
+            {/* Target Core Concepts */}
+            <div className="form-group">
+              <label className="form-label" htmlFor="concepts-input">
+                세부 수학 개념
+              </label>
+              <input
+                id="concepts-input"
+                type="text"
+                className="input-text"
+                placeholder="핵심 평가 속성을 쉼표로 나열하세요"
+                value={concepts}
+                onChange={(e) => setConcepts(e.target.value)}
+              />
+            </div>
+
+            {/* Achievement Standards */}
+            <div className="form-group">
+              <label className="form-label" htmlFor="standard-input">
+                교육과정 성취기준
+              </label>
+              <textarea
+                id="standard-input"
+                className="input-textarea"
+                placeholder="평가 준거가 될 초/중/고 교육과정 성취기준 코드를 기입하세요"
+                value={standard}
+                onChange={(e) => setStandard(e.target.value)}
+              />
+            </div>
+
+            {/* Number of Questions Selection */}
+            <div className="form-group">
+              <label className="form-label">문항 수 선택</label>
+              <div className="grade-pills">
+                <button
+                  type="button"
+                  className={`grade-pill-btn ${questionCount === 5 ? 'active' : ''}`}
+                  onClick={() => setQuestionCount(5)}
+                >
+                  5문항 출제
+                </button>
+                <button
+                  type="button"
+                  className={`grade-pill-btn ${questionCount === 10 ? 'active' : ''}`}
+                  onClick={() => setQuestionCount(10)}
+                >
+                  10문항 출제
+                </button>
+                <div style={{ visibility: 'hidden' }}></div>
+              </div>
+            </div>
+
+            {/* Difficulty Ratio inputs with validation indicators */}
+            <div className="form-group">
+              <div className="form-label">
+                <span>난이도 구성비 (쉬움 / 보통 / 어려움)</span>
+                <button
+                  type="button"
+                  className="btn-utility"
+                  style={{ padding: '0.15rem 0.5rem', fontSize: '0.75rem', borderRadius: '4px' }}
+                  onClick={handleAutoBalanceDifficulty}
+                >
+                  균등분배
+                </button>
+              </div>
+
+              <div className="ratio-sliders-container">
+                <div className="ratio-slider-row">
+                  <div className="ratio-slider-label">
+                    <span>🟢 쉬움 (하)</span>
+                    <span className="ratio-badge">{difficulty.easy}%</span>
+                  </div>
+                  <div className="slider-input-wrapper">
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="5"
+                      className="input-range"
+                      value={difficulty.easy}
+                      onChange={(e) => setDifficulty({ ...difficulty, easy: parseInt(e.target.value) })}
+                    />
+                  </div>
+                </div>
+
+                <div className="ratio-slider-row">
+                  <div className="ratio-slider-label">
+                    <span>🔵 보통 (중)</span>
+                    <span className="ratio-badge">{difficulty.medium}%</span>
+                  </div>
+                  <div className="slider-input-wrapper">
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="5"
+                      className="input-range"
+                      value={difficulty.medium}
+                      onChange={(e) => setDifficulty({ ...difficulty, medium: parseInt(e.target.value) })}
+                    />
+                  </div>
+                </div>
+
+                <div className="ratio-slider-row">
+                  <div className="ratio-slider-label">
+                    <span>🔴 어려움 (상)</span>
+                    <span className="ratio-badge">{difficulty.hard}%</span>
+                  </div>
+                  <div className="slider-input-wrapper">
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="5"
+                      className="input-range"
+                      value={difficulty.hard}
+                      onChange={(e) => setDifficulty({ ...difficulty, hard: parseInt(e.target.value) })}
+                    />
+                  </div>
+                </div>
+
+                {/* Stacking progress indicator bar */}
+                <div className="ratio-visual-bar">
+                  <div className="ratio-segment easy" style={{ width: `${difficulty.easy}%` }}></div>
+                  <div className="ratio-segment medium" style={{ width: `${difficulty.medium}%` }}></div>
+                  <div className="ratio-segment hard" style={{ width: `${difficulty.hard}%` }}></div>
+                </div>
+
+                {isDifficultyValid ? (
+                  <div className="validation-success-box">
+                    <span>✅ 난이도 비율 총합 검증 통과 (100%)</span>
+                  </div>
+                ) : (
+                  <div className="validation-warning-box">
+                    <span>⚠️ 비율 합산 불일치 (현재: {difficultySum}%, 목표: 100%)</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Question Type Ratio inputs with validation */}
+            <div className="form-group">
+              <div className="form-label">
+                <span>문항 유형 구성비 (객관식 / 단답형 / 서술형)</span>
+                <button
+                  type="button"
+                  className="btn-utility"
+                  style={{ padding: '0.15rem 0.5rem', fontSize: '0.75rem', borderRadius: '4px' }}
+                  onClick={handleAutoBalanceTypes}
+                >
+                  균등분배
+                </button>
+              </div>
+
+              <div className="ratio-sliders-container">
+                <div className="ratio-slider-row">
+                  <div className="ratio-slider-label">
+                    <span>📊 객관식 (선다형)</span>
+                    <span className="ratio-badge">{questionTypeRatio.choice}%</span>
+                  </div>
+                  <div className="slider-input-wrapper">
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="5"
+                      className="input-range"
+                      value={questionTypeRatio.choice}
+                      onChange={(e) => setQuestionTypeRatio({ ...questionTypeRatio, choice: parseInt(e.target.value) })}
+                    />
+                  </div>
+                </div>
+
+                <div className="ratio-slider-row">
+                  <div className="ratio-slider-label">
+                    <span>✏️ 단답형</span>
+                    <span className="ratio-badge">{questionTypeRatio.short}%</span>
+                  </div>
+                  <div className="slider-input-wrapper">
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="5"
+                      className="input-range"
+                      value={questionTypeRatio.short}
+                      onChange={(e) => setQuestionTypeRatio({ ...questionTypeRatio, short: parseInt(e.target.value) })}
+                    />
+                  </div>
+                </div>
+
+                <div className="ratio-slider-row">
+                  <div className="ratio-slider-label">
+                    <span>📝 서술형 (Descriptive)</span>
+                    <span className="ratio-badge">{questionTypeRatio.essay}%</span>
+                  </div>
+                  <div className="slider-input-wrapper">
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="5"
+                      className="input-range"
+                      value={questionTypeRatio.essay}
+                      onChange={(e) => setQuestionTypeRatio({ ...questionTypeRatio, essay: parseInt(e.target.value) })}
+                    />
+                  </div>
+                </div>
+
+                {/* Stacking progress indicator bar */}
+                <div className="ratio-visual-bar">
+                  <div className="ratio-segment choice" style={{ width: `${questionTypeRatio.choice}%` }}></div>
+                  <div className="ratio-segment short" style={{ width: `${questionTypeRatio.short}%` }}></div>
+                  <div className="ratio-segment essay" style={{ width: `${questionTypeRatio.essay}%` }}></div>
+                </div>
+
+                {isTypeValid ? (
+                  <div className="validation-success-box">
+                    <span>✅ 문항 유형 비율 총합 검증 통과 (100%)</span>
+                  </div>
+                ) : (
+                  <div className="validation-warning-box">
+                    <span>⚠️ 비율 합산 불일치 (현재: {typeSum}%, 목표: 100%)</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Assessment Purpose */}
+            <div className="form-group">
+              <label className="form-label" htmlFor="purpose-input">
+                평가 목적 설정
+              </label>
+              <input
+                id="purpose-input"
+                type="text"
+                className="input-text"
+                placeholder="예: 단원 형성평가, 총괄평가 대비"
+                value={purpose}
+                onChange={(e) => setPurpose(e.target.value)}
+              />
+            </div>
+
+            {/* Floating glowing trigger button */}
+            <button
+              type="button"
+              className="btn-generate"
+              disabled={!canGenerate}
+              onClick={handleGenerate}
+            >
+              {isGenerating ? (
+                <>⏳ 단원평가 제작 중...</>
+              ) : (
+                <>📝 단원평가 생성하기</>
+              )}
+            </button>
+            
+          </div>
+        </section>
+
+        {/* Right Side: Preview Panel */}
+        <section className="panel" style={{ minHeight: '500px', display: 'flex', flexDirection: 'column' }}>
+          
+          {/* Header containing Mode Switch Toggles and Utility Buttons */}
+          <div className="result-header">
+            {generatedExam ? (
+              <>
+                <div className="toggle-segment-control">
+                  <button
+                    type="button"
+                    className={`toggle-segment-btn ${viewMode === 'student' ? 'active' : ''}`}
+                    onClick={() => setViewMode('student')}
+                  >
+                    🎓 학생용 문제지 보기
+                  </button>
+                  <button
+                    type="button"
+                    className={`toggle-segment-btn ${viewMode === 'teacher' ? 'active' : ''}`}
+                    onClick={() => setViewMode('teacher')}
+                  >
+                    💼 교사용 해설지 보기
+                  </button>
+                </div>
+
+                <div className="utility-actions">
+                  <button
+                    type="button"
+                    className="btn-utility"
+                    onClick={handleCopyText}
+                  >
+                    📋 클립보드 복사
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-utility primary"
+                    onClick={handlePrint}
+                  >
+                    🖨️ 시험지 인쇄 (PDF)
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div style={{ fontWeight: 600, color: 'var(--text-muted)' }}>🔍 출제 결과 미리보기</div>
+            )}
+          </div>
+
+          {/* Body displaying Loading State, Empty State, or generated paper worksheet */}
+          <div className="exam-worksheet-wrapper" style={{ flex: 1, backgroundColor: 'var(--bg-app)' }}>
+            
+            {isGenerating && (
+              <div className="loading-overlay">
+                <div className="math-ripple-loader">
+                  <div></div>
+                  <div></div>
+                </div>
+                <div className="loader-status-text">
+                  {stepsText[loadingStep]}
+                </div>
+                <div className="loader-sub-text">
+                  학습자 오개념을 배제하는 단원 핵심 문제를 선별 중입니다.
+                </div>
+              </div>
+            )}
+
+            {!isGenerating && !generatedExam && (
+              <div className="empty-state">
+                <div className="empty-state-icon">
+                  ∑
+                </div>
+                <h3 className="empty-state-title">평가지가 아직 작성되지 않았습니다.</h3>
+                <p className="empty-state-desc">
+                  왼쪽 조건 설정 패널에서 학교급, 평가 단원, 비율 조합을 설정하고 <strong style={{ color: 'var(--primary)' }}>“단원평가 생성하기”</strong> 단추를 클릭하면 고품질 시험지가 여기에 생성됩니다.
+                </p>
+              </div>
+            )}
+
+            {!isGenerating && generatedExam && (
+              <article className="exam-worksheet">
+                
+                {/* Meta Paper Title */}
+                <div className="exam-meta-header">
+                  <h2 className="exam-main-title">{generatedExam.title}</h2>
+                  
+                  {/* Name columns grid */}
+                  <div className="student-info-grid">
+                    <div className="student-info-cell label">과목</div>
+                    <div className="student-info-cell">
+                      <span style={{ fontWeight: 500 }}>수학</span>
+                    </div>
+                    <div className="student-info-cell label">학년/반</div>
+                    <div className="student-info-cell">
+                      <input
+                        type="text"
+                        placeholder="___학년 ___반"
+                        className="student-info-input"
+                        value={studentGrade}
+                        onChange={(e) => setStudentGrade(e.target.value)}
+                      />
+                    </div>
+                    <div className="student-info-cell label">번호</div>
+                    <div className="student-info-cell">
+                      <input
+                        type="text"
+                        placeholder="___번"
+                        className="student-info-input"
+                        value={studentNum}
+                        onChange={(e) => setStudentNum(e.target.value)}
+                      />
+                    </div>
+                    <div className="student-info-cell label">성명</div>
+                    <div className="student-info-cell">
+                      <input
+                        type="text"
+                        placeholder="이름"
+                        className="student-info-input"
+                        value={studentName}
+                        onChange={(e) => setStudentName(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Educational Goal / Purpose card */}
+                <div className="objective-card">
+                  <div className="objective-title">🎯 평가 목표 및 의도</div>
+                  <p className="objective-text">
+                    {generatedExam.objective}
+                  </p>
+                </div>
+
+                {/* Questions Sequence list */}
+                <div className="questions-list">
+                  {generatedExam.questions.map((q) => {
+                    const typeKo = q.type === 'choice' ? '객관식' : q.type === 'short' ? '단답형' : '서술형';
+                    const diffKo = q.difficulty === 'easy' ? '하' : q.difficulty === 'medium' ? '중' : '상';
+
+                    return (
+                      <div key={q.id} className="question-item">
+                        
+                        {/* Question Text row */}
+                        <div className="question-text-row">
+                          <span className="question-number">{q.number}.</span>
+                          <div className="question-body-content">
+                            {q.question} 
+                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: '0.5rem' }}>
+                              [{typeKo} | 난이도 {diffKo}]
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Multiple Choice List grid */}
+                        {q.options && q.options.length > 0 && (
+                          <div className={`options-grid columns-${q.options.length === 5 ? '5' : '2'}`}>
+                            {q.options.map((option, idx) => (
+                              <div key={idx} className="option-item">
+                                <span style={{ fontWeight: 600, marginRight: '0.2rem' }}>{['①', '②', '③', '④', '⑤'][idx]}</span>
+                                <span>{option}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Answer line space (Visible only on Student View) */}
+                        {viewMode === 'student' && (
+                          <div className="student-answer-space">
+                            ✍️ 정답 또는 풀이 기재란: __________________________________________________
+                          </div>
+                        )}
+
+                        {/* Teacher Solution view (Visible only in Teacher View) */}
+                        {viewMode === 'teacher' && (
+                          <div className="teacher-solution-card">
+                            <div className="solution-header answer">
+                              <span>🔑 올바른 모범 정답</span>
+                            </div>
+                            <div className="solution-body" style={{ fontWeight: 700, color: 'var(--color-easy)' }}>
+                              {q.answer}
+                            </div>
+
+                            <div className="solution-header solution">
+                              <span>💡 풀이 과정 및 해설</span>
+                            </div>
+                            <div className="solution-body">
+                              {q.solution}
+                            </div>
+
+                            <div className="solution-header misconception">
+                              <span>⚠️ 학생 예상 오개념 분석 & 피드백 방향</span>
+                            </div>
+                            <div className="solution-body" style={{ backgroundColor: 'var(--color-misconception-bg)', color: 'var(--color-misconception)', borderTop: '1px dashed var(--color-misconception-border)' }}>
+                              {q.expectedMisconception}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Teacher-only Assessment Summary & Pedagogy Guidelines */}
+                {viewMode === 'teacher' && (
+                  <>
+                    <div className="teacher-answer-grid-card">
+                      <h3 className="teacher-grid-title">📊 문항별 정답 신속 확인표</h3>
+                      <table className="answer-table">
+                        <thead>
+                          <tr>
+                            <th>번호</th>
+                            <th>문항 유형</th>
+                            <th>난이도</th>
+                            <th>정답</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {generatedExam.questions.map((q) => (
+                            <tr key={q.id}>
+                              <td><strong>{q.number}</strong></td>
+                              <td>{q.type === 'choice' ? '객관식' : q.type === 'short' ? '단답형' : '서술형'}</td>
+                              <td>
+                                <span style={{
+                                  color: q.difficulty === 'easy' ? 'var(--color-easy)' : q.difficulty === 'medium' ? 'var(--color-medium)' : 'var(--color-hard)',
+                                  fontWeight: 600
+                                }}>
+                                  {q.difficulty === 'easy' ? '쉬움' : q.difficulty === 'medium' ? '보통' : '어려움'}
+                                </span>
+                              </td>
+                              <td className="correct">{q.answer}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <div className="teacher-memo-card">
+                      <h4 className="teacher-memo-title">🧠 교육학 전문가의 평가 설계 리뷰</h4>
+                      <p className="teacher-memo-text">
+                        {generatedExam.teacherMemo}
+                      </p>
+                    </div>
+                  </>
+                )}
+                
+              </article>
+            )}
+            
+          </div>
+        </section>
+        
+      </main>
+
+      {/* Floating Clipboard Copy Success Notification Alert */}
+      {showToast && (
+        <div className="toast">
+          <span>{toastMessage}</span>
+        </div>
+      )}
     </>
-  )
+  );
 }
 
-export default App
+export default App;
