@@ -1,73 +1,105 @@
-# React + TypeScript + Vite
+# 🏫 수학 단원평가 제작소 (Math Unit Test Maker)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+> **수학 교육과정 성취기준과 인지적 오개념 분석에 기반하여 고품질 단원평가 문항과 교사용 교수학습 피드백지를 맞춤 설계하는 AI 기반 교육 보조 웹 애플리케이션입니다.**
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 📖 1. 개발 배경 및 목적
+수학 교사, 예비 교사, 그리고 교육 전공자들은 학생들의 학업 성취도를 진단하기 위해 단원평가지를 정기적으로 제작합니다. 그러나 이 과정에서 다음과 같은 실무적 한계에 부딪힙니다:
+- **평가 밸런싱의 어려움**: 출제 목적에 맞추어 문항 수, 난이도 분포, 문항 유형(객관식, 단답형, 서술형)을 수학 교육과정 성취기준과 매끄럽게 결합하기 어렵습니다.
+- **오개념 진단의 한계**: 학생들이 자주 범하는 수학적 인지 장벽(오개념)을 미리 예측하여 문항 오답 선지나 채점 루브릭을 구조적으로 짜는 데 많은 리서치 시간이 소요됩니다.
+- **출제 시간 과다**: 문제 지문 제작, 상세 솔루션 수립, 개별 학생 처방 피드백을 동시에 작성하는 데 행정적 부담이 매우 큽니다.
 
-## React Compiler
+**“수학 단원평가 제작소”**는 이러한 문제를 극복하기 위해 설계되었습니다. 교사가 몇 가지 기본 조건(학년, 단원, 개념, 성취기준, 난이도 및 유형 구성비, 평가 목적)만 입력하면, **OpenAI GPT API**를 활용해 교육과정에 정렬된 최적의 학생용 문제지와 교사용 해설·오개념 분석표를 실시간으로 자동 설계해 주어 교사의 평가 전문성과 실무 생산성을 동시에 보장합니다.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+---
 
-## Expanding the ESLint configuration
+## 🎯 2. 대상 사용자
+- **전국 초·중·고등학교 수학 교사**: 수업 후 신속하게 형성평가나 중간·기말고사 대비 시험지를 기획하고자 하는 현직 교사.
+- **사범대학 및 수학교육과 전공생 / 예비교사**: 교육실습이나 수업 시연을 위해 교수학습 지도안 및 문항 평가지를 정량적인 기준에 따라 제작해야 하는 학습자.
+- **수학 전문 강사 및 교육 콘텐츠 기획자**: 성취기준 중심의 맞춤형 수학 평가 자료를 제작하는 교육 실무자.
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+---
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## ✨ 3. 주요 기능
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+### ⚙️ 입체적 조건 설정 패널 (좌측)
+- **학교급 맞춤 템플릿**: 초등, 중등, 고등 버튼 클릭 시 그에 상응하는 실제 국가 교육과정 성취기준 및 단원 명칭이 자동으로 로드되어 신속한 이종 테스트가 가능합니다.
+- **유동적인 난이도 구성비 (쉬움 / 보통 / 어려움)**: 슬라이더 바를 조작하여 출제 난이도 비율을 100% 한도 내에서 설계하며, 합산 비율 경고 필터가 포함되어 안전한 조건 구성을 유도합니다.
+- **균형 잡힌 문항 유형 구성비 (객관식 / 단답형 / 서술형)**: 선다형과 서술형 비율을 교육 목적에 맞춰 자유롭게 배분하고 세그먼트 시각 바를 통해 실시간으로 확인할 수 있습니다.
+- **자동 비율 균등분배 헬퍼**: 원클릭으로 난이도(30/40/30) 및 문항유형(40/40/20)을 교과 표준 비율로 즉시 균형화해 줍니다.
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### 📄 최적화된 평가 결과 패널 (우측)
+- **교과서 스타일 세로 분수 동적 렌더러**: 브라우저나 외부 라이브러리 충돌을 예방하기 위해, 텍스트 형태의 수식 분수 표기(예: `2/7`, `13/5`)를 CSS Flexbox 기하 구조로 분석하여 교과서 규격의 **세로형 분수**로 미려하게 렌더링합니다.
+- **다차원 지수 첨자화**: 지수 기호(`^`) 대신 가독성이 검증된 수학용 지수 첨자 유니코드 기호(`²`, `³`, `ˣ` 등)를 적용해 어떠한 뷰포트에서도 수식이 한눈에 보입니다.
+- **Simulated AI 파이프라인**: 출제 처리 과정 중 진행 상태를 4단계(성취기준 해독 → 오개념 비교 → 해설 생성 → 교사용 검토)로 시각화하여 교수 설계 경험을 제공합니다.
+- **학생용 / 교사용 보기 1:1 동적 토글**:
+  - **학생용 보기**: 문제지 타이틀, 인적사항 표(학년/반/번호/성명), 문제 지문, 객관식 5지선다 및 수려한 학생 정답 기재란만 노출됩니다.
+  - **교사용 보기**: 모범 정답(`🔑 올바른 모범 정답`), 단계별 정밀 해설(`💡 풀이 과정 및 해설`), 수학 교육학적 통찰이 담긴 오개념 예방 코멘트(`⚠️ 학생 예상 오개념 분석`)가 수려한 컬러 카드로 덧씌워지며, 하단에는 **문항별 신속 정답 요약표**와 **종합 검토 피드백**이 추가로 형성됩니다.
+
+### 📤 마크다운 클립보드 복사 및 A4 종이 인쇄 (`@media print`)
+- **원클릭 복사**: 복사 버튼 클릭 시 마크다운 및 텍스트 구조로 정돈된 시험지가 클립보드에 담기며, 복사 성공 토스트 팝업이 노출됩니다. 외부 한글(HWP)이나 워드 파일에 깔끔하게 붙여넣어 편집할 수 있습니다.
+- **A4 프린트 최적화**: 브라우저 인쇄(`Ctrl + P` 또는 인쇄 버튼 클릭)를 트리거할 시, 스타일시트가 반응하여 좌측 입력 설정 영역, 네비게이션 헤더, 유틸리티 바를 화면에서 완벽히 은닉하고, **A4 규격에 맞춤 설정된 여백과 실물 문제지 양식**만 깔끔하게 레이아웃하여 PDF나 인쇄용지로 출력해 줍니다.
+
+---
+
+## 🛠️ 4. 사용 기술
+- **Frontend Core**: React 19, TypeScript 5, Vite 8
+- **Styling**: Native CSS3 (Harmonious HSL System Theme, Glassmorphism Cards, Micro-animations)
+- **Backend API Serverless**: Node.js, Vercel serverless function (`/api/generate-assessment`)
+- **AI Engine**: OpenAI GPT-4o-mini (Strict `json_schema` Structured Outputs 완벽 보장)
+
+---
+
+## 🚀 5. 로컬 실행 방법
+본 프로젝트는 Vite의 로컬 프록시 Connect 미들웨어를 내장하고 있어, 별도의 백엔드 포트를 따로 열거나 프레임워크를 중복 구동할 필요 없이 한 번의 명령으로 프론트와 API 핸들러가 완벽히 로컬 연동됩니다.
+
+### 1) 종속성 패키지 설치
+```bash
+npm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### 2) 로컬 개발 서버 실행
+```bash
+npm run dev
 ```
+- 터미널에 출력되는 로컬 주소(기본: `http://localhost:5173`)로 접속합니다.
+- 좌측 패널의 입력값을 수정한 후 문항을 실시간으로 출제할 수 있습니다.
+
+### 3) 프로덕션용 최적화 빌드 검증
+```bash
+npm run build
+```
+- 번들러가 동작하여 `dist/` 내에 경량화된 HTML/JS/CSS 정적 프로덕션 에셋 파일과 `api/` 내 서버리스 함수를 완벽하게 컴파일 및 빌드해 냅니다.
+
+---
+
+## ⚙️ 6. 환경변수 설정 방법
+본 웹앱은 실제 인공지능 기반 단원평가 생성을 위해 OpenAI API Key 보안 환경변수를 필요로 합니다.
+
+1. 프로젝트 루트 디렉토리에 `.env.local` 파일을 생성합니다.
+2. 생성한 파일 내에 다음과 같이 발급받은 OpenAI API Key를 설정해야 합니다.
+   ```env
+   OPENAI_API_KEY=발급받은_OpenAI_API_KEY_입력
+   ```
+
+> ⚠️ **보안 주의사항**
+> - 실제 OpenAI API Key 값이 소스코드나 README.md, 혹은 퍼블릭 저장소에 노출되지 않도록 각별히 유의해 주세요.
+> - `.env.local` 파일은 이미 `.gitignore`에 등록되어 있어 원격 저장소(GitHub 등)에 노출되지 않습니다.
+> - 프론트엔드 클라이언트 사이드 환경변수(`VITE_` 접두사)를 사용하지 않고 오직 백엔드 서버리스 함수에서만 안전하게 사용되므로 보안성이 매우 우수합니다.
+
+---
+
+## 🌐 7. 배포 URL
+- **배포 플랫폼**: Vercel (Zero-Config Serverless Deployment)
+- **배포 서비스 주소**: [https://math-unit-test-maker.vercel.app](https://math-unit-test-maker.vercel.app)
+
+*(실제 배포 시, Vercel 프로젝트 설정의 **Environment Variables** 메뉴에서 `OPENAI_API_KEY` 값을 등록하여 안전하게 연동 및 활성화할 수 있습니다.)*
+
+---
+
+## 🔮 8. 보완 및 고도화할 점 (Future Roadmap)
+- **출제 비용 및 속도 관리 레이어 (Caching & Rate Limit)**: 동일하거나 매우 유사한 단원/성취기준 출제 요청 발생 시 중복 생성을 예방하기 위해 Redis 캐싱 레이어 및 생성 지연 처리를 가미한 레이트 리밋 추가.
+- **벡터 그래픽 수식화 (SVG/Canvas 기하 도형 엔진)**: 수학 문제 특성상 자주 필요한 도형(삼각형, 원, 함수 그래프 등)을 JSON 좌표 데이터로 전달받아 웹 화면에 실시간 SVG 드로잉을 지원하는 시각적 캔버스 컴포넌트 개발.
+- **수학 기호 호환 확장 (KaTeX integration)**: 중고등 고난도 행렬, 미적분학 다중 적분식, 복잡한 기호 체계를 위한 KaTeX 렌더링 선택적 호환 레이어 결합.
+- **국가 교육과정 DB 매핑**: 초·중·고 학년별 교과 단원 평가 기준을 자체 RDB화하여 성취기준 코드를 검색 및 다이렉트 바인딩해 주는 내장 교과 사전 검색기 기능 수반.
