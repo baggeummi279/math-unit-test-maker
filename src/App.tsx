@@ -1,20 +1,22 @@
 import { useState, useEffect } from 'react';
-import { getMockExam } from './mockData';
 import type { ExamDraft, GradeLevel, RatioValues, TypeRatioValues } from './types';
 
 // Helper to render textbook-style vertical fractions automatically from horizontal notation (e.g. 2/7)
 function renderMathText(text: string | undefined) {
   if (!text) return '';
 
+  // Replace literal '\n' sequences with actual newline characters
+  const cleanedText = text.replace(/\\n/g, '\n');
+
   const fractionRegex = /(\d+)\/(\d+)/g;
   const parts = [];
   let lastIndex = 0;
   let match;
 
-  while ((match = fractionRegex.exec(text)) !== null) {
+  while ((match = fractionRegex.exec(cleanedText)) !== null) {
     const matchIndex = match.index;
     if (matchIndex > lastIndex) {
-      parts.push(text.substring(lastIndex, matchIndex));
+      parts.push(cleanedText.substring(lastIndex, matchIndex));
     }
     const numerator = match[1];
     const denominator = match[2];
@@ -27,11 +29,11 @@ function renderMathText(text: string | undefined) {
     lastIndex = fractionRegex.lastIndex;
   }
 
-  if (lastIndex < text.length) {
-    parts.push(text.substring(lastIndex));
+  if (lastIndex < cleanedText.length) {
+    parts.push(cleanedText.substring(lastIndex));
   }
 
-  return parts.length > 0 ? parts : text;
+  return parts.length > 0 ? parts : cleanedText;
 }
 
 
@@ -110,8 +112,28 @@ function App() {
     setQuestionTypeRatio({ choice: 40, short: 40, essay: 20 });
   };
 
-  // --- Simulated Generation Logic ---
-  const handleGenerate = () => {
+interface GPTQuestion {
+  number: number;
+  difficulty: '쉬움' | '보통' | '어려움';
+  type: '객관식' | '단답형' | '서술형';
+  concept: string;
+  question: string;
+  choices: string[];
+  answer: string;
+  solution: string;
+  misconception: string;
+}
+
+interface GPTResponse {
+  title: string;
+  goals: string[];
+  questions: GPTQuestion[];
+  teacherNotes: string[];
+  error?: string;
+}
+
+  // --- Simulated & Live Generation Logic ---
+  const handleGenerate = async () => {
     if (!canGenerate) return;
     
     setIsGenerating(true);
@@ -124,15 +146,28 @@ function App() {
       '교사용 정답표, 상세 해설 및 지도안 설계 작성 중...'
     ];
 
+    // Start progress simulation
     let currentStep = 0;
     const interval = setInterval(() => {
-      currentStep++;
-      if (currentStep < steps.length) {
+      if (currentStep < steps.length - 1) {
+        currentStep++;
         setLoadingStep(currentStep);
-      } else {
-        clearInterval(interval);
-        // Match mock data based on input parameters
-        const exam = getMockExam({
+      }
+    }, 600);
+
+    const gradeMap: Record<GradeLevel, string> = {
+      elementary: '초등학교',
+      middle: '중학교',
+      high: '고등학교'
+    };
+
+    try {
+      const response = await fetch('/api/generate-assessment', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
           gradeLevel,
           unitName,
           concepts,
@@ -141,12 +176,60 @@ function App() {
           difficulty,
           questionTypeRatio,
           purpose
-        });
-        setGeneratedExam(exam);
-        setIsGenerating(false);
-        triggerToast('✨ 단원평가 초안이 성공적으로 생성되었습니다!');
+        })
+      });
+
+      const responseText = await response.text();
+      let responseData: GPTResponse;
+      try {
+        responseData = JSON.parse(responseText) as GPTResponse;
+      } catch (err) {
+        const parseMessage = err instanceof Error ? err.message : String(err);
+        throw new Error(`서버 응답이 올바른 JSON 형식이 아닙니다. (파싱 실패: ${parseMessage})`, { cause: err });
       }
-    }, 600);
+
+      if (!response.ok || responseData.error) {
+        throw new Error(responseData.error || `서버 오류 (상태 코드: ${response.status})`);
+      }
+
+      // Complete simulated loader transition
+      clearInterval(interval);
+      setLoadingStep(steps.length - 1);
+      await new Promise(r => setTimeout(r, 450)); // smooth transition
+
+      const mappedQuestions = responseData.questions.map((q: GPTQuestion, idx: number) => ({
+        id: idx + 1,
+        number: q.number || (idx + 1),
+        type: (q.type === '객관식' ? 'choice' : q.type === '단답형' ? 'short' : 'essay') as 'choice' | 'short' | 'essay',
+        difficulty: (q.difficulty === '쉬움' ? 'easy' : q.difficulty === '보통' ? 'medium' : 'hard') as 'easy' | 'medium' | 'hard',
+        question: q.question,
+        options: q.choices && q.choices.length > 0 ? q.choices : undefined,
+        answer: q.answer,
+        solution: q.solution,
+        expectedMisconception: q.misconception
+      }));
+
+      const mappedExam: ExamDraft = {
+        title: responseData.title || `${gradeMap[gradeLevel]} 수학 [${unitName}] 단원평가`,
+        objective: responseData.goals ? responseData.goals.join('\n') : '',
+        gradeText: gradeMap[gradeLevel],
+        unitName: unitName || '수학 단원',
+        purpose: purpose || '형성평가 및 오개념 확인',
+        questions: mappedQuestions,
+        teacherMemo: responseData.teacherNotes ? responseData.teacherNotes.join('\n') : ''
+      };
+
+      setGeneratedExam(mappedExam);
+      setIsGenerating(false);
+      triggerToast('✨ OpenAI GPT 기반 맞춤 단원평가가 생성되었습니다!');
+
+    } catch (err) {
+      clearInterval(interval);
+      setIsGenerating(false);
+      console.error(err);
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      alert(`⚠️ 단원평가 생성에 실패했습니다.\n\n사유: ${errorMessage}`);
+    }
   };
 
   // --- Toast Trigger ---
