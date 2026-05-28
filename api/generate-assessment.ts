@@ -1,8 +1,28 @@
-import { IncomingMessage, ServerResponse } from 'http';
-import type { ExamFormInputs } from '../src/types';
+import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-interface AssessmentRequest extends IncomingMessage {
-  body?: Record<string, unknown>;
+type GradeLevel = 'elementary' | 'middle' | 'high';
+
+interface RatioValues {
+  easy: number;
+  medium: number;
+  hard: number;
+}
+
+interface TypeRatioValues {
+  choice: number;
+  short: number;
+  essay: number;
+}
+
+interface ExamFormInputs {
+  gradeLevel: GradeLevel;
+  unitName: string;
+  concepts: string;
+  standard: string;
+  questionCount: 5 | 10;
+  difficulty: RatioValues;
+  questionTypeRatio: TypeRatioValues;
+  purpose: string;
 }
 
 interface OpenAIResponse {
@@ -13,14 +33,21 @@ interface OpenAIResponse {
   }>;
 }
 
+declare const process: {
+  env: {
+    OPENAI_API_KEY?: string;
+    [key: string]: string | undefined;
+  };
+};
+
 // Helper to parse POST body stream in Node.js (handles stream buffers from Vite Connect)
-async function getRequestBody(req: AssessmentRequest): Promise<Record<string, unknown>> {
+async function getRequestBody(req: any): Promise<Record<string, unknown>> {
   if (req.body) {
-    return req.body;
+    return req.body as Record<string, unknown>;
   }
   return new Promise((resolve, reject) => {
     let body = '';
-    req.on('data', (chunk: string | Buffer) => { body += chunk; });
+    req.on('data', (chunk: any) => { body += chunk; });
     req.on('end', () => {
       try {
         resolve(JSON.parse(body) as Record<string, unknown>);
@@ -28,11 +55,14 @@ async function getRequestBody(req: AssessmentRequest): Promise<Record<string, un
         resolve({});
       }
     });
-    req.on('error', (err: Error) => { reject(err); });
+    req.on('error', (err: any) => { reject(err); });
   });
 }
 
-export default async function handler(req: AssessmentRequest, res: ServerResponse) {
+export default async function handler(req: any, res: any) {
+  const _req = req as VercelRequest;
+  const _res = res as VercelResponse;
+  if (!_req || !_res) return;
   // CORS Headers support
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
