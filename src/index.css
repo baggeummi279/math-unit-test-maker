@@ -1576,4 +1576,110 @@ body {
   color: var(--text-primary);
 }
 
+/* Recommended Units Selection Area */
+.recommend-units-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+  background-color: var(--bg-input);
+  padding: 0.75rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+
+.recommend-units-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.recommend-unit-btn {
+  font-family: var(--font-sans);
+  background-color: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  padding: 0.6rem 0.8rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  outline: none;
+  transition: var(--transition);
+  text-align: left;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.recommend-unit-btn:hover {
+  border-color: var(--border-focus);
+  color: var(--text-primary);
+  background-color: hsla(var(--hue), 20%, 50%, 0.02);
+}
+
+.recommend-unit-btn.active {
+  border-color: var(--primary);
+  background-color: var(--primary-glow);
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.recommend-check-icon {
+  font-size: 0.8rem;
+  color: var(--primary);
+}
+
+.recommend-applied-info {
+  font-size: 0.75rem;
+  color: var(--primary);
+  margin-top: 0.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-weight: 500;
+}
+
+/* Curriculum Picker Grid & Concept Tags */
+.curriculum-selector-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+}
+
+.concept-tags-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.concept-tag-btn {
+  font-family: var(--font-sans);
+  background-color: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  outline: none;
+  transition: var(--transition);
+  display: inline-flex;
+  align-items: center;
+}
+
+.concept-tag-btn:hover {
+  border-color: var(--border-focus);
+  color: var(--text-primary);
+  background-color: hsla(var(--hue), 20%, 50%, 0.02);
+}
+
+.concept-tag-btn.active {
+  border-color: var(--primary);
+  background-color: var(--primary-glow);
+  color: var(--primary);
+  font-weight: 600;
+}
+
 

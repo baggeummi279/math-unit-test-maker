@@ -212,18 +212,248 @@ function cleanOptionText(text: string | undefined): string {
   }
   return cleaned;
 }
+interface ConceptItem {
+  name: string;
+}
 
+interface UnitItem {
+  name: string;
+  standard: string;
+  purpose: string;
+  concepts: ConceptItem[];
+}
+
+const GRADE_OPTIONS: Record<GradeLevel, string[]> = {
+  elementary: ['1학년', '2학년', '3학년', '4학년', '5학년', '6학년'],
+  middle: ['1학년', '2학년', '3학년'],
+  high: ['공통수학', '수학Ⅰ', '수학Ⅱ', '확률과 통계', '미적분', '기하']
+};
+
+const CURRICULUM_DATA: Record<
+  GradeLevel,
+  Record<string, Record<string, UnitItem[]>>
+> = {
+  elementary: {
+    '1학년': {
+      '2학기': [
+        {
+          name: '100까지의 수',
+          standard: '100까지의 수의 순서와 크기를 이해하고, 수를 세고 비교할 수 있다.',
+          purpose: '100까지의 수를 읽고 쓰며, 수의 순서와 크기를 비교할 수 있는지 확인한다.',
+          concepts: [
+            { name: '수 세기' },
+            { name: '두 자리 수' },
+            { name: '수의 순서와 크기 비교' }
+          ]
+        },
+        {
+          name: '덧셈과 뺄셈 (1)',
+          standard: '받아올림과 받아내림이 없는 덧셈과 뺄셈의 계산 원리를 이해하고 계산할 수 있다.',
+          purpose: '덧셈과 뺄셈의 기본 계산 원리를 이해하고 계산할 수 있는지 확인한다.',
+          concepts: [
+            { name: '받아올림이 없는 덧셈' },
+            { name: '받아내림이 없는 뺄셈' },
+            { name: '덧셈식과 뺄셈식' }
+          ]
+        },
+        {
+          name: '여러 가지 모양',
+          standard: '주변의 여러 가지 입체 모양을 관찰하고 모양의 특징에 따라 분류할 수 있다.',
+          purpose: '여러 가지 입체 모양의 특징을 이해하고 구분할 수 있는지 확인한다.',
+          concepts: [
+            { name: '상자 모양' },
+            { name: '둥근 기둥 모양' },
+            { name: '공 모양' },
+            { name: '모양 분류' }
+          ]
+        },
+        {
+          name: '덧셈과 뺄셈 (2)',
+          standard: '받아올림과 받아내림이 있는 덧셈과 뺄셈의 계산 원리를 이해하고 계산할 수 있다.',
+          purpose: '받아올림과 받아내림이 있는 계산 과정을 이해하고 정확히 계산할 수 있는지 확인한다.',
+          concepts: [
+            { name: '받아올림이 있는 덧셈' },
+            { name: '받아내림이 있는 뺄셈' },
+            { name: '덧셈과 뺄셈의 관계' }
+          ]
+        },
+        {
+          name: '시계보기와 규칙찾기',
+          standard: '시각을 읽고, 규칙적인 배열에서 규칙을 찾을 수 있다.',
+          purpose: '시각을 읽고 반복되는 규칙을 찾아 설명할 수 있는지 확인한다.',
+          concepts: [
+            { name: '몇 시' },
+            { name: '몇 시 30분' },
+            { name: '규칙 찾기' },
+            { name: '반복되는 배열' }
+          ]
+        },
+        {
+          name: '덧셈과 뺄셈 (3)',
+          standard: '덧셈과 뺄셈을 활용하여 실생활 문제를 해결할 수 있다.',
+          purpose: '덧셈과 뺄셈을 상황에 맞게 적용하여 문제를 해결할 수 있는지 확인한다.',
+          concepts: [
+            { name: '여러 수의 덧셈' },
+            { name: '여러 수의 뺄셈' },
+            { name: '덧셈과 뺄셈의 활용' }
+          ]
+        }
+      ]
+    }
+  },
+  middle: {
+    '1학년': {
+      '1학기': [
+        {
+          name: '소인수분해',
+          standard: '자연수를 소인수분해하고, 이를 이용하여 최대공약수와 최소공배수를 구할 수 있다.',
+          purpose: '소인수분해의 의미를 이해하고 최대공약수와 최소공배수 문제에 적용할 수 있는지 확인한다.',
+          concepts: [
+            { name: '소수와 합성수' },
+            { name: '소인수분해' },
+            { name: '최대공약수' },
+            { name: '최소공배수' },
+            { name: '약수의 개수' }
+          ]
+        },
+        {
+          name: '정수와 유리수',
+          standard: '정수와 유리수의 뜻을 이해하고, 사칙계산을 할 수 있다.',
+          purpose: '정수와 유리수의 개념을 이해하고 계산 원리를 적용할 수 있는지 확인한다.',
+          concepts: [
+            { name: '양수와 음수' },
+            { name: '정수와 유리수' },
+            { name: '수직선' },
+            { name: '유리수의 덧셈과 뺄셈' },
+            { name: '유리수의 곱셈과 나눗셈' }
+          ]
+        },
+        {
+          name: '문자와 식',
+          standard: '문자를 사용하여 식을 나타내고, 일차식의 계산을 할 수 있다.',
+          purpose: '문자를 사용한 식의 의미를 이해하고 일차식의 계산을 수행할 수 있는지 확인한다.',
+          concepts: [
+            { name: '문자의 사용' },
+            { name: '식의 값' },
+            { name: '일차식' },
+            { name: '일차식의 계산' }
+          ]
+        },
+        {
+          name: '일차방정식',
+          standard: '등식의 성질을 이용하여 일차방정식을 풀고, 이를 문제 해결에 활용할 수 있다.',
+          purpose: '일차방정식의 풀이 원리를 이해하고 상황에 맞게 활용할 수 있는지 확인한다.',
+          concepts: [
+            { name: '등식의 성질' },
+            { name: '이항' },
+            { name: '일차방정식의 풀이' },
+            { name: '해의 의미' },
+            { name: '일차방정식의 활용' }
+          ]
+        }
+      ]
+    }
+  },
+  high: {}
+};
+
+const getUnitsForSelection = (level: GradeLevel, grade: string, semester: string): UnitItem[] => {
+  const levelData = CURRICULUM_DATA[level];
+  if (levelData) {
+    const gradeData = levelData[grade];
+    if (gradeData) {
+      const semesterData = gradeData[semester];
+      if (semesterData && semesterData.length > 0) {
+        return semesterData;
+      }
+    }
+  }
+
+  // Fallback database based on school level
+  if (level === 'elementary') {
+    return [
+      {
+        name: '분수의 덧셈과 뺄셈',
+        standard: '분모가 같은 분수의 덧셈과 뺄셈의 계산 원리를 이해하고 계산할 수 있다.',
+        purpose: '분수의 덧셈과 뺄셈 원리를 이해하고 계산 과정에서 약분을 적용할 수 있는지 확인한다.',
+        concepts: [
+          { name: '분모가 같은 분수의 덧셈' },
+          { name: '분모가 같은 분수의 뺄셈' },
+          { name: '통분의 기초' },
+          { name: '약분' }
+        ]
+      },
+      {
+        name: '소수의 덧셈과 뺄셈',
+        standard: '소수의 의미와 자릿값을 이해하고 소수의 덧셈과 뺄셈을 할 수 있다.',
+        purpose: '소수의 자릿값을 바탕으로 소수의 덧셈과 뺄셈을 정확히 수행할 수 있는지 확인한다.',
+        concepts: [
+          { name: '소수의 자릿값' },
+          { name: '소수의 크기 비교' },
+          { name: '소수의 덧셈과 뺄셈' }
+        ]
+      }
+    ];
+  } else if (level === 'middle') {
+    return [
+      {
+        name: '일차함수',
+        standard: '일차함수의 그래프의 성질을 이해하고, 그래프와 식의 관계를 해석할 수 있다.',
+        purpose: '일차함수의 식과 그래프를 연결하고 기울기와 y절편의 의미를 해석할 수 있는지 확인한다.',
+        concepts: [
+          { name: '함수의 뜻' },
+          { name: '일차함수의 그래프' },
+          { name: '기울기' },
+          { name: 'y절편' }
+        ]
+      },
+      {
+        name: '확률의 기본',
+        standard: '경우의 수를 바탕으로 사건의 확률을 구하고 그 의미를 설명할 수 있다.',
+        purpose: '경우의 수와 확률의 관계를 이해하고 기본적인 확률을 계산할 수 있는지 확인한다.',
+        concepts: [
+          { name: '경우의 수' },
+          { name: '사건과 확률' },
+          { name: '확률의 계산' }
+        ]
+      }
+    ];
+  } else {
+    return [
+      {
+        name: '이차함수',
+        standard: '이차함수의 그래프의 성질을 이해하고, 이를 이용하여 함수의 최대·최소를 구할 수 있다.',
+        purpose: '이차함수의 그래프와 식을 연결하고 꼭짓점과 최대·최소를 해석할 수 있는지 확인한다.',
+        concepts: [
+          { name: '이차함수의 그래프' },
+          { name: '꼭짓점과 축의 방정식' },
+          { name: '함수의 최대·최소' }
+        ]
+      },
+      {
+        name: '수열',
+        standard: '등차수열과 등비수열의 규칙을 이해하고 일반항과 합을 구할 수 있다.',
+        purpose: '수열의 규칙을 파악하고 일반항과 합을 구하는 과정을 이해하는지 확인한다.',
+        concepts: [
+          { name: '등차수열' },
+          { name: '등비수열' },
+          { name: '수열의 합' }
+        ]
+      }
+    ];
+  }
+};
 
 function App() {
   // --- Active Tab State ('direct' = 수동 출제, 'diagnosis' = 체크테스트 진단) ---
   const [activeTab, setActiveTab] = useState<'direct' | 'diagnosis'>('diagnosis');
   const [showAppliedBanner, setShowAppliedBanner] = useState(false);
 
-  // --- Form States (Default to Elementary Fractional Arithmetic) ---
+  // --- Form States (Default to Elementary 1학년 2학기 100까지의 수) ---
   const [gradeLevel, setGradeLevel] = useState<GradeLevel>('elementary');
-  const [unitName, setUnitName] = useState('분수의 덧셈과 뺄셈');
-  const [concepts, setConcepts] = useState('동분모 분수의 덧셈, 대분수 변환, 받아올림');
-  const [standard, setStandard] = useState('[4수01-16] 분모가 같은 분수의 덧셈과 뺄셈의 계산 원리를 이해하고 그 계산을 할 수 있다.');
+  const [unitName, setUnitName] = useState('100까지의 수');
+  const [concepts, setConcepts] = useState('수 세기');
+  const [standard, setStandard] = useState('100까지의 수의 순서와 크기를 이해하고, 수를 세고 비교할 수 있다.');
   const [questionCount, setQuestionCount] = useState<5 | 10>(5);
   
   // Difficulty ratios (easy, medium, hard) - default 30% / 40% / 30%
@@ -240,7 +470,23 @@ function App() {
     essay: 20
   });
 
-  const [purpose, setPurpose] = useState('형성평가 및 기초 개념 확인');
+  const [purpose, setPurpose] = useState('100까지의 수를 읽고 쓰며, 수의 순서와 크기를 비교할 수 있는지 확인한다.');
+  
+  // --- Interactive Curriculum Selector States ---
+  const [selectedGrade, setSelectedGrade] = useState<string>('1학년');
+  const [selectedSemester, setSelectedSemester] = useState<string>('2학기');
+  const [selectedUnit, setSelectedUnit] = useState<UnitItem | null>({
+    name: '100까지의 수',
+    standard: '100까지의 수의 순서와 크기를 이해하고, 수를 세고 비교할 수 있다.',
+    purpose: '100까지의 수를 읽고 쓰며, 수의 순서와 크기를 비교할 수 있는지 확인한다.',
+    concepts: [
+      { name: '수 세기' },
+      { name: '두 자리 수' },
+      { name: '수의 순서와 크기 비교' }
+    ]
+  });
+  const [selectedConceptName, setSelectedConceptName] = useState<string | null>('수 세기');
+  const [recommendApplied, setRecommendApplied] = useState(true);
 
   // --- Checking Test Mode States ---
   const [diagGradeLevel, setDiagGradeLevel] = useState<GradeLevel>('elementary');
@@ -277,22 +523,116 @@ function App() {
   // Auto-fill templates when GradeLevel changes synchronously in the event handler to avoid cascading renders
   const handleGradeChange = (level: GradeLevel) => {
     setGradeLevel(level);
+    
+    // Set appropriate default grade/subject and semester for the selected level
+    let defaultGrade = '';
+    let defaultSemester = '1학기';
+    
     if (level === 'elementary') {
-      setUnitName('분수의 덧셈과 뺄셈');
-      setConcepts('동분모 분수의 덧셈, 대분수 변환, 받아올림');
-      setStandard('[4수01-16] 분모가 같은 분수의 덧셈과 뺄셈의 계산 원리를 이해하고 그 계산을 할 수 있다.');
-      setPurpose('형성평가 및 기초 개념 확인');
+      defaultGrade = '1학년';
+      defaultSemester = '2학기'; // Default to 2학기 for elementary to showcase the 1-2 example data
     } else if (level === 'middle') {
-      setUnitName('소인수분해');
-      setConcepts('소인수, 약수의 개수, 최대공약수, 서로소');
-      setStandard('[9수01-01] 소인수분해의 뜻을 알고, 자연수를 소인수분해할 수 있다.');
-      setPurpose('학기 초 진단평가 및 오개념 진정성 파악');
+      defaultGrade = '1학년';
+      defaultSemester = '1학기'; // Default to 1학기 for middle to showcase the 1-1 example data
     } else {
-      setUnitName('다항식의 연산과 나머지정리');
-      setConcepts('다항식의 전개, 곱셈 공식의 변형, 나머지 정리 증명, 3차식 나눗셈');
-      setStandard('[10수01-02] 나머지정리의 의미를 이해하고, 이를 활용하여 문제를 해결할 수 있다.');
-      setPurpose('중간고사 대비 심화 성취평가');
+      defaultGrade = '공통수학';
+      defaultSemester = '1학기';
     }
+    
+    setSelectedGrade(defaultGrade);
+    setSelectedSemester(defaultSemester);
+    
+    // Get units for the selection
+    const units = getUnitsForSelection(level, defaultGrade, defaultSemester);
+    if (units && units.length > 0) {
+      const firstUnit = units[0];
+      setSelectedUnit(firstUnit);
+      
+      const firstConcept = firstUnit.concepts?.[0]?.name || '';
+      setSelectedConceptName(firstConcept);
+      
+      // Auto-fill values
+      setUnitName(firstUnit.name);
+      setConcepts(firstConcept);
+      setStandard(firstUnit.standard);
+      setPurpose(firstUnit.purpose);
+      setRecommendApplied(true);
+    } else {
+      setSelectedUnit(null);
+      setSelectedConceptName(null);
+      setRecommendApplied(false);
+    }
+  };
+
+  const handleSelectGrade = (grade: string) => {
+    setSelectedGrade(grade);
+    const units = getUnitsForSelection(gradeLevel, grade, selectedSemester);
+    if (units && units.length > 0) {
+      const firstUnit = units[0];
+      setSelectedUnit(firstUnit);
+      const firstConcept = firstUnit.concepts?.[0]?.name || '';
+      setSelectedConceptName(firstConcept);
+      
+      // Auto-fill
+      setUnitName(firstUnit.name);
+      setConcepts(firstConcept);
+      setStandard(firstUnit.standard);
+      setPurpose(firstUnit.purpose);
+      setRecommendApplied(true);
+    } else {
+      setSelectedUnit(null);
+      setSelectedConceptName(null);
+      setRecommendApplied(false);
+    }
+  };
+
+  const handleSelectSemester = (semester: string) => {
+    setSelectedSemester(semester);
+    const units = getUnitsForSelection(gradeLevel, selectedGrade, semester);
+    if (units && units.length > 0) {
+      const firstUnit = units[0];
+      setSelectedUnit(firstUnit);
+      const firstConcept = firstUnit.concepts?.[0]?.name || '';
+      setSelectedConceptName(firstConcept);
+      
+      // Auto-fill
+      setUnitName(firstUnit.name);
+      setConcepts(firstConcept);
+      setStandard(firstUnit.standard);
+      setPurpose(firstUnit.purpose);
+      setRecommendApplied(true);
+    } else {
+      setSelectedUnit(null);
+      setSelectedConceptName(null);
+      setRecommendApplied(false);
+    }
+  };
+
+  const handleSelectUnit = (unit: UnitItem) => {
+    setSelectedUnit(unit);
+    const firstConcept = unit.concepts?.[0]?.name || '';
+    setSelectedConceptName(firstConcept);
+    
+    // Auto-fill
+    setUnitName(unit.name);
+    setConcepts(firstConcept);
+    setStandard(unit.standard);
+    setPurpose(unit.purpose);
+    setRecommendApplied(true);
+    triggerToast(`✨ 추천 단원 [${unit.name}]이 선택되었습니다.`);
+  };
+
+  const handleSelectConcept = (conceptName: string) => {
+    if (!selectedUnit) return;
+    setSelectedConceptName(conceptName);
+    
+    // Auto-fill
+    setUnitName(selectedUnit.name);
+    setConcepts(conceptName);
+    setStandard(selectedUnit.standard);
+    setPurpose(selectedUnit.purpose);
+    setRecommendApplied(true);
+    triggerToast(`✨ 개념 [${conceptName}]이 적용되었습니다.`);
   };
 
   // Auto-fill templates for Checking Test grade changes
@@ -519,19 +859,19 @@ interface GPTResponse {
   };
 
   const handleApplyDiagnosis = () => {
-    if (!diagnosisResult) return;
+    if (!diagnosisResult || !diagnosisResult.recommendedSettings) return;
 
-    const { recommendedSettings } = diagnosisResult;
+    const settings = diagnosisResult.recommendedSettings;
 
     // Apply suggested settings to the main assessment inputs
-    setGradeLevel(recommendedSettings.gradeLevel);
-    setUnitName(recommendedSettings.unitName);
-    setConcepts(recommendedSettings.concepts);
-    setStandard(recommendedSettings.standard);
-    setQuestionCount(recommendedSettings.questionCount);
-    setDifficulty(recommendedSettings.difficulty);
-    setQuestionTypeRatio(recommendedSettings.questionTypeRatio);
-    setPurpose(recommendedSettings.purpose);
+    setGradeLevel(settings.gradeLevel || 'elementary');
+    setUnitName(settings.unitName || '');
+    setConcepts(settings.concepts || '');
+    setStandard(settings.standard || '');
+    setQuestionCount(settings.questionCount ?? 5);
+    setDifficulty(settings.difficulty || { easy: 30, medium: 40, hard: 30 });
+    setQuestionTypeRatio(settings.questionTypeRatio || { choice: 40, short: 40, essay: 20 });
+    setPurpose(settings.purpose || '');
 
     // Turn back to manual setup tab and show notice banner
     setActiveTab('direct');
@@ -540,7 +880,7 @@ interface GPTResponse {
   };
 
   const isAllCheckQuestionsAnswered = () => {
-    if (!checkTest) return false;
+    if (!checkTest || !checkTest.questions) return false;
     return checkTest.questions.every(q => {
       const ans = studentAnswers[q.number];
       return ans !== undefined && ans.trim().length > 0;
@@ -739,6 +1079,135 @@ interface GPTResponse {
                 </div>
               </div>
 
+              {/* Grade/Subject Selection */}
+              <div className="form-group">
+                <label className="form-label">
+                  학년/과목 선택 <span className="form-label-help">* 필수 선택</span>
+                </label>
+                <div className="curriculum-selector-grid">
+                  {(GRADE_OPTIONS[gradeLevel] || []).map((grade) => (
+                    <button
+                      key={grade}
+                      type="button"
+                      className={`recommend-unit-btn ${selectedGrade === grade ? 'active' : ''}`}
+                      onClick={() => handleSelectGrade(grade)}
+                      style={{ justifyContent: 'center', textAlign: 'center', padding: '0.5rem 0.25rem', fontSize: '0.85rem' }}
+                    >
+                      {grade}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Semester Selection */}
+              <div className="form-group">
+                <label className="form-label">
+                  학기 선택 <span className="form-label-help">* 필수 선택</span>
+                </label>
+                <div className="grade-pills">
+                  {['1학기', '2학기'].map((sem) => (
+                    <button
+                      key={sem}
+                      type="button"
+                      className={`grade-pill-btn ${selectedSemester === sem ? 'active' : ''}`}
+                      onClick={() => handleSelectSemester(sem)}
+                    >
+                      {sem}
+                    </button>
+                  ))}
+                  <div style={{ visibility: 'hidden' }}></div>
+                </div>
+              </div>
+
+              {/* Prototype Information Notice Banner */}
+              <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+                <div className="recommend-applied-info" style={{
+                  backgroundColor: 'var(--primary-glow)',
+                  border: '1px dashed var(--border-focus)',
+                  borderRadius: 'var(--radius-sm)',
+                  padding: '0.75rem 1rem',
+                  fontSize: '0.8rem',
+                  lineHeight: '1.4',
+                  color: 'var(--primary)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  fontWeight: 500
+                }}>
+                  <span>💡 현재는 프로토타입으로 일부 대표 단원만 제공됩니다. 원하는 단원이 없으면 아래 입력칸에 직접 입력할 수 있습니다.</span>
+                </div>
+              </div>
+
+              {/* Recommended Units Selector */}
+              <div className="form-group">
+                <label className="form-label">
+                  추천 단원 선택 <span className="form-label-help">* 학년-학기 맞춤 추천</span>
+                </label>
+                <div className="recommend-units-container">
+                  {(getUnitsForSelection(gradeLevel, selectedGrade, selectedSemester) || []).length > 0 ? (
+                    <div className="recommend-units-grid">
+                      {(getUnitsForSelection(gradeLevel, selectedGrade, selectedSemester) || []).map((unit) => (
+                        <button
+                          key={unit.name}
+                          type="button"
+                          className={`recommend-unit-btn ${selectedUnit?.name === unit.name ? 'active' : ''}`}
+                          onClick={() => handleSelectUnit(unit)}
+                        >
+                          <span>{unit.name}</span>
+                          {selectedUnit?.name === unit.name && (
+                            <span className="recommend-check-icon">✓</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{
+                      padding: '1.25rem 1rem',
+                      border: '1px dashed var(--border)',
+                      borderRadius: 'var(--radius-sm)',
+                      backgroundColor: 'var(--bg-input)',
+                      color: 'var(--text-muted)',
+                      textAlign: 'center',
+                      fontSize: '0.85rem',
+                      lineHeight: '1.5',
+                      fontWeight: 500
+                    }}>
+                      ⚠️ 해당 학년·학기의 추천 단원은 아직 준비되지 않았습니다.<br />
+                      평가 단원과 세부 개념을 직접 입력해 주세요.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Concept Tag Selection */}
+              {selectedUnit && (
+                <div className="form-group" style={{ animation: 'fadeIn 0.3s ease' }}>
+                  <label className="form-label">
+                    세부 개념 추천 선택 <span className="form-label-help">* 클릭 시 자동 채워짐</span>
+                  </label>
+                  <div className="concept-tags-grid">
+                    {(selectedUnit.concepts || []).map((concept) => (
+                      <button
+                        key={concept.name}
+                        type="button"
+                        className={`concept-tag-btn ${selectedConceptName === concept.name ? 'active' : ''}`}
+                        onClick={() => handleSelectConcept(concept.name)}
+                      >
+                        <span>{concept.name}</span>
+                        {selectedConceptName === concept.name && (
+                          <span style={{ marginLeft: '0.25rem', color: 'var(--primary)' }}>✓</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                  {recommendApplied && (
+                    <div className="recommend-applied-info" style={{ marginTop: '0.5rem' }}>
+                      <span>✨ 추천 개념 [ {selectedConceptName} ] 적용 완료!</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Target Unit Name */}
               <div className="form-group">
                 <label className="form-label" htmlFor="unit-input">
@@ -750,7 +1219,11 @@ interface GPTResponse {
                   className="input-text"
                   placeholder="예: 분수의 덧셈과 뺄셈, 일차방정식"
                   value={unitName}
-                  onChange={(e) => setUnitName(e.target.value)}
+                  onChange={(e) => {
+                    setUnitName(e.target.value);
+                    setSelectedConceptName(null);
+                    setRecommendApplied(false);
+                  }}
                 />
               </div>
 
@@ -765,7 +1238,11 @@ interface GPTResponse {
                   className="input-text"
                   placeholder="핵심 평가 속성을 쉼표로 나열하세요"
                   value={concepts}
-                  onChange={(e) => setConcepts(e.target.value)}
+                  onChange={(e) => {
+                    setConcepts(e.target.value);
+                    setSelectedConceptName(null);
+                    setRecommendApplied(false);
+                  }}
                 />
               </div>
 
@@ -779,7 +1256,11 @@ interface GPTResponse {
                   className="input-textarea"
                   placeholder="평가 준거가 될 초/중/고 교육과정 성취기준 코드를 기입하세요"
                   value={standard}
-                  onChange={(e) => setStandard(e.target.value)}
+                  onChange={(e) => {
+                    setStandard(e.target.value);
+                    setSelectedConceptName(null);
+                    setRecommendApplied(false);
+                  }}
                 />
               </div>
 
@@ -992,7 +1473,11 @@ interface GPTResponse {
                   className="input-text"
                   placeholder="예: 단원 형성평가, 총괄평가 대비"
                   value={purpose}
-                  onChange={(e) => setPurpose(e.target.value)}
+                  onChange={(e) => {
+                    setPurpose(e.target.value);
+                    setSelectedConceptName(null);
+                    setRecommendApplied(false);
+                  }}
                 />
               </div>
 
@@ -1455,15 +1940,15 @@ interface GPTResponse {
                             <div className="diagnosis-header">
                               <span className="diagnosis-title">📋 취약 개념 분석서</span>
                               <span className="diagnosis-score-badge">
-                                맞힌 개수: {diagnosisResult.correctCount} / {checkTest?.questions.length || 0}
+                                맞힌 개수: {diagnosisResult?.correctCount ?? 0} / {checkTest?.questions?.length || 0}
                               </span>
                             </div>
 
                             <div className="diagnosis-section">
                               <div className="diagnosis-section-title">🔴 보완이 시급한 취약 세부 개념</div>
                               <div className="diagnosis-concepts-list">
-                                {diagnosisResult.weakConcepts.length > 0 ? (
-                                  diagnosisResult.weakConcepts.map((concept, idx) => (
+                                {(diagnosisResult?.weakConcepts || []).length > 0 ? (
+                                  (diagnosisResult?.weakConcepts || []).map((concept, idx) => (
                                     <span key={idx} className="diagnosis-concept-tag">{concept}</span>
                                   ))
                                 ) : (
@@ -1474,19 +1959,19 @@ interface GPTResponse {
 
                             <div className="diagnosis-section">
                               <div className="diagnosis-section-title">🧠 학생의 예상 인지 오류 (오개념)</div>
-                              <p className="diagnosis-text"><MathText text={diagnosisResult.expectedMisconceptions} /></p>
+                              <p className="diagnosis-text"><MathText text={diagnosisResult?.expectedMisconceptions || ''} /></p>
                             </div>
 
                             <div className="diagnosis-section">
                               <div className="diagnosis-section-title">📌 추가 학습 보충이 필요한 이유</div>
-                              <p className="diagnosis-text"><MathText text={diagnosisResult.reasonForReinforcement} /></p>
+                              <p className="diagnosis-text"><MathText text={diagnosisResult?.reasonForReinforcement || ''} /></p>
                             </div>
 
                             {/* --- New Section: Detailed Scored Review Per Question --- */}
                             <div className="diagnosis-section" style={{ marginTop: '1.5rem', borderTop: '1px dashed var(--border)', paddingTop: '1.5rem' }}>
                               <div className="diagnosis-section-title">📝 문항별 정밀 채점 리뷰</div>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '0.75rem' }}>
-                                {diagnosisResult.questionsAnalysis && diagnosisResult.questionsAnalysis.map((qa) => (
+                                {diagnosisResult?.questionsAnalysis && diagnosisResult.questionsAnalysis.map((qa) => (
                                   <div key={qa.number} style={{
                                     backgroundColor: 'var(--bg-input)',
                                     border: '1px solid var(--border)',
@@ -1535,27 +2020,33 @@ interface GPTResponse {
                                 <tbody>
                                   <tr>
                                     <td className="label">학교급 / 단원</td>
-                                    <td>{diagGradeMap[diagnosisResult.recommendedSettings.gradeLevel]} / {diagnosisResult.recommendedSettings.unitName}</td>
+                                    <td>
+                                      {diagGradeMap[diagnosisResult?.recommendedSettings?.gradeLevel || 'elementary']} / {diagnosisResult?.recommendedSettings?.unitName || ''}
+                                    </td>
                                   </tr>
                                   <tr>
                                     <td className="label">집중 출제 개념</td>
-                                    <td>{diagnosisResult.recommendedSettings.concepts}</td>
+                                    <td>{diagnosisResult?.recommendedSettings?.concepts || ''}</td>
                                   </tr>
                                   <tr>
                                     <td className="label">성취기준 적용</td>
-                                    <td>{diagnosisResult.recommendedSettings.standard}</td>
+                                    <td>{diagnosisResult?.recommendedSettings?.standard || ''}</td>
                                   </tr>
                                   <tr>
                                     <td className="label">문항 수 및 평가목적</td>
-                                    <td>{diagnosisResult.recommendedSettings.questionCount}문항 / {diagnosisResult.recommendedSettings.purpose}</td>
+                                    <td>{diagnosisResult?.recommendedSettings?.questionCount ?? 5}문항 / {diagnosisResult?.recommendedSettings?.purpose || ''}</td>
                                   </tr>
                                   <tr>
                                     <td className="label">난이도 비율</td>
-                                    <td>쉬움 {diagnosisResult.recommendedSettings.difficulty.easy}% / 보통 {diagnosisResult.recommendedSettings.difficulty.medium}% / 어려움 {diagnosisResult.recommendedSettings.difficulty.hard}%</td>
+                                    <td>
+                                      쉬움 {diagnosisResult?.recommendedSettings?.difficulty?.easy ?? 30}% / 보통 {diagnosisResult?.recommendedSettings?.difficulty?.medium ?? 40}% / 어려움 {diagnosisResult?.recommendedSettings?.difficulty?.hard ?? 30}%
+                                    </td>
                                   </tr>
                                   <tr>
                                     <td className="label">문항 유형 비율</td>
-                                    <td>객관식 {diagnosisResult.recommendedSettings.questionTypeRatio.choice}% / 단답형 {diagnosisResult.recommendedSettings.questionTypeRatio.short}% / 서술형 {diagnosisResult.recommendedSettings.questionTypeRatio.essay}%</td>
+                                    <td>
+                                      객관식 {diagnosisResult?.recommendedSettings?.questionTypeRatio?.choice ?? 40}% / 단답형 {diagnosisResult?.recommendedSettings?.questionTypeRatio?.short ?? 40}% / 서술형 {diagnosisResult?.recommendedSettings?.questionTypeRatio?.essay ?? 20}%
+                                    </td>
                                   </tr>
                                 </tbody>
                               </table>
