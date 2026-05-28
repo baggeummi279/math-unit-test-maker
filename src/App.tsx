@@ -30,42 +30,146 @@ function translateMathTerms(text: string | undefined): string {
   return translated;
 }
 
-// Helper to render textbook-style vertical fractions automatically from horizontal notation (e.g. 2/7)
-function renderMathText(text: string | undefined) {
-  if (!text) return '';
+// Convert fractions and LaTeX notations securely into structured tokens (___FRAC_N_D___ / ___MIXED_W_N_D___)
+function preprocessFractionTokens(text: string): string {
+  // 0. Recover JS form feed (\f) escape character from backslash-f conversion failure
+  let processed = text.replace(/\f/g, '\\f');
 
-  // First apply fail-safe math translation
+  // 1. Temporary protection maps for Dates, URLs, and File Paths to avoid slash (/) confusion
+  const placeholders: { [key: string]: string } = {};
+  let placeholderCounter = 0;
+
+  const urlRegex = /https?:\/\/[^\s]+/g;
+  const pathRegex = /[a-zA-Z]:[\\/][\w.\\/-]+/g;
+  const dateRegex = /\b\d{4}[-\/\.]\d{1,2}[-\/\.]\d{1,2}\b/g;
+
+  const protect = (regex: RegExp, prefix: string) => {
+    processed = processed.replace(regex, (match) => {
+      const key = `___${prefix}_${placeholderCounter++}___`;
+      placeholders[key] = match;
+      return key;
+    });
+  };
+
+  protect(urlRegex, 'URL');
+  protect(pathRegex, 'PATH');
+  protect(dateRegex, 'DATE');
+
+  // Clean all LaTeX wrappers ($ and \(\)) first since we are not using KaTeX
+  processed = processed.replace(/\$/g, '');
+  processed = processed.replace(/\\\(|\\\)/g, '');
+
+  // 2. Convert Mixed Fractions first (preventing standalone fraction interference!)
+  // 2a. mixed LaTeX: 2\frac{1}{4} or 2 \frac{1}{4}
+  processed = processed.replace(/(\d+)\s*\\frac\{(\d+)\}\{(\d+)\}/g, (_, w, n, d) => `___MIXED_${w}_${n}_${d}___`);
+  // 2b. mixed LaTeX (no brackets): 2\frac14 or 2 \frac14
+  processed = processed.replace(/(\d+)\s*\\frac(\d)(\d)/g, (_, w, n, d) => `___MIXED_${w}_${n}_${d}___`);
+  // 2c. mixed LaTeX (half bracket): 2\frac{1}4
+  processed = processed.replace(/(\d+)\s*\\frac\{(\d+)\}(\d)/g, (_, w, n, d) => `___MIXED_${w}_${n}_${d}___`);
+  // 2d. mixed LaTeX (half bracket 2): 2\frac1{4}
+  processed = processed.replace(/(\d+)\s*\\frac(\d)\{(\d+)\}/g, (_, w, n, d) => `___MIXED_${w}_${n}_${d}___`);
+  // 2e. mixed plain: 2 1/4
+  processed = processed.replace(/\b(\d+)\s+(\d+)\/(\d+)\b/g, (_, w, n, d) => `___MIXED_${w}_${n}_${d}___`);
+
+  // 3. Convert Standalone fractions
+  // 3a. standalone LaTeX: \frac{3}{8}
+  processed = processed.replace(/\\frac\{(\d+)\}\{(\d+)\}/g, (_, n, d) => `___FRAC_${n}_${d}___`);
+  // 3b. standalone LaTeX (no brackets): \frac38
+  processed = processed.replace(/\\frac(\d)(\d)/g, (_, n, d) => `___FRAC_${n}_${d}___`);
+  // 3c. standalone LaTeX (half bracket): \frac{3}8
+  processed = processed.replace(/\\frac\{(\d+)\}(\d)/g, (_, n, d) => `___FRAC_${n}_${d}___`);
+  // 3d. standalone LaTeX (half bracket 2): \frac3{8}
+  processed = processed.replace(/\\frac(\d)\{(\d+)\}/g, (_, n, d) => `___FRAC_${n}_${d}___`);
+  // 3e. standalone plain: 3/8
+  processed = processed.replace(/\b(\d+)\/(\d+)\b/g, (_, n, d) => `___FRAC_${n}_${d}___`);
+
+  // 4. Strip any residual curly brackets or latex fractions leftover
+  processed = processed.replace(/\\frac/g, '');
+  processed = processed.replace(/\\sqrt\{([^{}]+)\}/g, '루트 $1');
+  processed = processed.replace(/\\sqrt/g, '루트');
+  processed = processed.replace(/[{}]/g, '');
+
+  // 5. Restore protected regions
+  Object.entries(placeholders).forEach(([key, val]) => {
+    processed = processed.split(key).join(val);
+  });
+
+  return processed;
+}
+
+// Custom UI Component to render clean textbook-style vertical fractions
+function Fraction({ numerator, denominator }: { numerator: string; denominator: string }) {
+  return (
+    <span className="math-fraction-container">
+      <span className="math-fraction-numerator">{numerator}</span>
+      <span className="math-fraction-line"></span>
+      <span className="math-fraction-denominator">{denominator}</span>
+    </span>
+  );
+}
+
+// Custom UI Component to render clean mixed fractions (whole number next to fraction)
+function MixedFraction({ whole, numerator, denominator }: { whole: string; numerator: string; denominator: string }) {
+  return (
+    <span className="math-mixed-fraction">
+      <span className="math-whole-number">{whole}</span>
+      <Fraction numerator={numerator} denominator={denominator} />
+    </span>
+  );
+}
+
+interface MathTextProps {
+  text: string | undefined;
+}
+
+function MathText({ text }: MathTextProps) {
+  if (!text) return null;
+
+  // 1. Translate terms
   const translatedText = translateMathTerms(text);
 
-  // Replace literal '\n' sequences with actual newline characters
-  const cleanedText = translatedText.replace(/\\n/g, '\n');
+  // 2. Fix literal newline characters
+  let cleanedText = translatedText.replace(/\\n/g, '\n');
 
-  const fractionRegex = /(\d+)\/(\d+)/g;
-  const parts = [];
-  let lastIndex = 0;
-  let match;
+  // 3. Unify fractions into secure tokens
+  cleanedText = preprocessFractionTokens(cleanedText);
 
-  while ((match = fractionRegex.exec(cleanedText)) !== null) {
-    const matchIndex = match.index;
-    if (matchIndex > lastIndex) {
-      parts.push(cleanedText.substring(lastIndex, matchIndex));
-    }
-    const numerator = match[1];
-    const denominator = match[2];
-    parts.push(
-      <span key={matchIndex} className="fraction">
-        <span className="numerator">{numerator}</span>
-        <span className="denominator">{denominator}</span>
-      </span>
-    );
-    lastIndex = fractionRegex.lastIndex;
-  }
+  // 4. Split and render 교차 (cross-render) tokens next to standard text
+  const regex = /(___FRAC_\d+_\d+___|___MIXED_\d+_\d+_\d+___)/g;
+  const parts = cleanedText.split(regex);
 
-  if (lastIndex < cleanedText.length) {
-    parts.push(cleanedText.substring(lastIndex));
-  }
-
-  return parts.length > 0 ? parts : cleanedText;
+  return (
+    <>
+      {parts.map((part, index) => {
+        if (part.startsWith('___FRAC_') && part.endsWith('___')) {
+          const match = part.match(/___FRAC_(\d+)_(\d+)___/);
+          if (match) {
+            return <Fraction key={index} numerator={match[1]} denominator={match[2]} />;
+          }
+          return part;
+        } else if (part.startsWith('___MIXED_') && part.endsWith('___')) {
+          const match = part.match(/___MIXED_(\d+)_(\d+)_(\d+)___/);
+          if (match) {
+            return <MixedFraction key={index} whole={match[1]} numerator={match[2]} denominator={match[3]} />;
+          }
+          return part;
+        } else {
+          // Plain text with line breaks supported
+          const lines = part.split('\n');
+          return (
+            <span key={index}>
+              {lines.map((line, idx) => (
+                <span key={idx}>
+                  {line}
+                  {idx < lines.length - 1 && <br />}
+                </span>
+              ))}
+            </span>
+          );
+        }
+      })}
+    </>
+  );
 }
 
 // Helper to remove any duplicate numbering prefix (e.g. ①, ②, 1., 1), A., a. etc.) from GPT generated choices
@@ -1008,7 +1112,7 @@ interface GPTResponse {
                   <div className="objective-card">
                     <div className="objective-title">🎯 평가 목표 및 의도</div>
                     <p className="objective-text">
-                      {renderMathText(generatedExam.objective)}
+                      <MathText text={generatedExam.objective} />
                     </p>
                   </div>
 
@@ -1025,7 +1129,7 @@ interface GPTResponse {
                           <div className="question-text-row">
                             <span className="question-number">{q.number}.</span>
                             <div className="question-body-content">
-                              {renderMathText(q.question)} 
+                              <MathText text={q.question} /> 
                               <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: '0.5rem' }}>
                                 [{typeKo} | 난이도 {diffKo}]
                               </span>
@@ -1038,7 +1142,7 @@ interface GPTResponse {
                               {q.options.map((option, idx) => (
                                 <div key={idx} className="option-item">
                                   <span style={{ fontWeight: 600, marginRight: '0.2rem' }}>{['①', '②', '③', '④', '⑤'][idx]}</span>
-                                  <span>{renderMathText(cleanOptionText(option))}</span>
+                                  <span><MathText text={cleanOptionText(option)} /></span>
                                 </div>
                               ))}
                             </div>
@@ -1058,21 +1162,21 @@ interface GPTResponse {
                                 <span>🔑 올바른 모범 정답</span>
                               </div>
                               <div className="solution-body" style={{ fontWeight: 700, color: 'var(--color-easy)' }}>
-                                {renderMathText(q.answer)}
+                                <MathText text={q.answer} />
                               </div>
 
                               <div className="solution-header solution">
                                 <span>💡 풀이 과정 및 해설</span>
                               </div>
                               <div className="solution-body">
-                                {renderMathText(q.solution)}
+                                <MathText text={q.solution} />
                               </div>
 
                               <div className="solution-header misconception">
                                 <span>⚠️ 학생 예상 오개념 분석 & 피드백 방향</span>
                               </div>
                               <div className="solution-body" style={{ backgroundColor: 'var(--color-misconception-bg)', color: 'var(--color-misconception)', borderTop: '1px dashed var(--color-misconception-border)' }}>
-                                {renderMathText(q.expectedMisconception)}
+                                <MathText text={q.expectedMisconception} />
                               </div>
                             </div>
                           )}
@@ -1108,7 +1212,7 @@ interface GPTResponse {
                                     {q.difficulty === 'easy' ? '쉬움' : q.difficulty === 'medium' ? '보통' : '어려움'}
                                   </span>
                                 </td>
-                                <td className="correct">{renderMathText(q.answer)}</td>
+                                <td className="correct"><MathText text={q.answer} /></td>
                               </tr>
                             ))}
                           </tbody>
@@ -1118,7 +1222,7 @@ interface GPTResponse {
                       <div className="teacher-memo-card">
                         <h4 className="teacher-memo-title">🧠 교육학 전문가의 평가 설계 리뷰</h4>
                         <p className="teacher-memo-text">
-                          {renderMathText(generatedExam.teacherMemo)}
+                          <MathText text={generatedExam.teacherMemo} />
                         </p>
                       </div>
                     </>
@@ -1271,7 +1375,7 @@ interface GPTResponse {
                             return (
                               <div key={q.number} className="checktest-question-card">
                                 <div className="checktest-question-title">Q{q.number}. {q.concept}</div>
-                                <div style={{ whiteSpace: 'pre-wrap', marginBottom: '0.5rem' }}>{renderMathText(q.question)}</div>
+                                <div style={{ whiteSpace: 'pre-wrap', marginBottom: '0.5rem' }}><MathText text={q.question} /></div>
                                 
                                 {/* 100% Multiple Choice 5 buttons layout */}
                                 <div className="checktest-choices">
@@ -1285,7 +1389,7 @@ interface GPTResponse {
                                         className={`checktest-choice-btn ${isSelected ? 'selected' : ''}`}
                                         onClick={() => setStudentAnswers({ ...studentAnswers, [q.number]: optionChar })}
                                       >
-                                        <strong>{optionChar}</strong> {renderMathText(cleanOptionText(choiceText))}
+                                        <strong>{optionChar}</strong> <MathText text={cleanOptionText(choiceText)} />
                                       </button>
                                     );
                                   })}
@@ -1343,12 +1447,12 @@ interface GPTResponse {
 
                             <div className="diagnosis-section">
                               <div className="diagnosis-section-title">🧠 학생의 예상 인지 오류 (오개념)</div>
-                              <p className="diagnosis-text">{renderMathText(diagnosisResult.expectedMisconceptions)}</p>
+                              <p className="diagnosis-text"><MathText text={diagnosisResult.expectedMisconceptions} /></p>
                             </div>
 
                             <div className="diagnosis-section">
                               <div className="diagnosis-section-title">📌 추가 학습 보충이 필요한 이유</div>
-                              <p className="diagnosis-text">{renderMathText(diagnosisResult.reasonForReinforcement)}</p>
+                              <p className="diagnosis-text"><MathText text={diagnosisResult.reasonForReinforcement} /></p>
                             </div>
 
                             {/* --- New Section: Detailed Scored Review Per Question --- */}
@@ -1389,7 +1493,7 @@ interface GPTResponse {
                                         </tr>
                                         <tr>
                                           <td style={{ padding: '0.25rem 0', color: 'var(--text-muted)', fontWeight: 600, verticalAlign: 'top' }}>예상 오개념 분석</td>
-                                          <td style={{ padding: '0.25rem 0', color: 'var(--text-secondary)', lineHeight: 1.4 }}>{renderMathText(qa.misconception)}</td>
+                                          <td style={{ padding: '0.25rem 0', color: 'var(--text-secondary)', lineHeight: 1.4 }}><MathText text={qa.misconception} /></td>
                                         </tr>
                                       </tbody>
                                     </table>

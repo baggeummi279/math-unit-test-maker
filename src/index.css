@@ -1530,4 +1530,50 @@ body {
   }
 }
 
+/* Textbook-style Vertical Fractions styling */
+.math-fraction-container {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  vertical-align: middle;
+  line-height: 1.15;
+  margin: 0 0.15rem;
+  font-size: 0.95em;
+}
+
+.math-fraction-numerator {
+  padding: 0 0.1rem;
+  font-size: 0.85em;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.math-fraction-line {
+  width: 100%;
+  height: 1px;
+  background-color: var(--text-primary);
+  margin: 0.05rem 0;
+}
+
+.math-fraction-denominator {
+  padding: 0 0.1rem;
+  font-size: 0.85em;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.math-mixed-fraction {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+  margin: 0 0.15rem;
+}
+
+.math-whole-number {
+  font-size: 1.1em;
+  font-weight: 700;
+  margin-right: 0.1rem;
+  color: var(--text-primary);
+}
+
 
