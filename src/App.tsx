@@ -69,7 +69,7 @@ function preprocessFractionTokens(text: string): string {
   // 2d. mixed LaTeX (half bracket 2): 2\frac1{4}
   processed = processed.replace(/(\d+)\s*\\frac(\d)\{(\d+)\}/g, (_, w, n, d) => `___MIXED_${w}_${n}_${d}___`);
   // 2e. mixed plain: 2 1/4
-  processed = processed.replace(/\b(\d+)\s+(\d+)\/(\d+)\b/g, (_, w, n, d) => `___MIXED_${w}_${n}_${d}___`);
+  processed = processed.replace(/(?<!\d)(\d+)\s+(\d+)\/(\d+)(?!\d)/g, (_, w, n, d) => `___MIXED_${w}_${n}_${d}___`);
 
   // 3. Convert Standalone fractions
   // 3a. standalone LaTeX: \frac{3}{8}
@@ -81,7 +81,7 @@ function preprocessFractionTokens(text: string): string {
   // 3d. standalone LaTeX (half bracket 2): \frac3{8}
   processed = processed.replace(/\\frac(\d)\{(\d+)\}/g, (_, n, d) => `___FRAC_${n}_${d}___`);
   // 3e. standalone plain: 3/8
-  processed = processed.replace(/\b(\d+)\/(\d+)\b/g, (_, n, d) => `___FRAC_${n}_${d}___`);
+  processed = processed.replace(/(?<!\d)(\d+)\/(\d+)(?!\d)/g, (_, n, d) => `___FRAC_${n}_${d}___`);
 
   // 4. Strip any residual curly brackets or latex fractions leftover
   processed = processed.replace(/\\frac/g, '');
