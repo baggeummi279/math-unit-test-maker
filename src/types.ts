@@ -48,3 +48,36 @@ export interface ExamDraft {
   questions: MathQuestion[];
   teacherMemo: string;
 }
+
+export interface CheckTestQuestion {
+  number: number;
+  concept: string;
+  question: string;
+  choices: string[];
+  answer: string;
+}
+
+export interface CheckTestDraft {
+  title: string;
+  questions: CheckTestQuestion[];
+}
+
+export interface QuestionAnalysis {
+  number: number;
+  isCorrect: boolean;
+  correctAnswer: string;
+  studentAnswer: string;
+  concept: string;
+  misconception: string;
+}
+
+export interface DiagnosisResult {
+  correctCount: number;
+  weakConcepts: string[];
+  expectedMisconceptions: string;
+  reasonForReinforcement: string;
+  questionsAnalysis: QuestionAnalysis[];
+  recommendedSettings: ExamFormInputs;
+}
+
+

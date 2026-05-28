@@ -1,6 +1,8 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
-import apiHandler from './api/generate-assessment.ts'
+import generateAssessmentHandler from './api/generate-assessment.ts'
+import generateCheckTestHandler from './api/generate-check-test.ts'
+import diagnoseCheckTestHandler from './api/diagnose-check-test.ts'
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
@@ -15,9 +17,28 @@ export default defineConfig(({ mode }) => {
         name: 'api-serverless-middleware',
         configureServer(server) {
           server.middlewares.use(async (req, res, next) => {
-            if (req.url?.startsWith('/api/generate-assessment')) {
+            const url = req.url || '';
+            if (url.startsWith('/api/generate-assessment')) {
               try {
-                await apiHandler(req, res);
+                await generateAssessmentHandler(req, res);
+              } catch (err) {
+                const message = err instanceof Error ? err.message : String(err);
+                res.statusCode = 500;
+                res.setHeader('Content-Type', 'application/json; charset=utf-8');
+                res.end(JSON.stringify({ error: `Vite Dev Server API Error: ${message}` }));
+              }
+            } else if (url.startsWith('/api/generate-check-test')) {
+              try {
+                await generateCheckTestHandler(req, res);
+              } catch (err) {
+                const message = err instanceof Error ? err.message : String(err);
+                res.statusCode = 500;
+                res.setHeader('Content-Type', 'application/json; charset=utf-8');
+                res.end(JSON.stringify({ error: `Vite Dev Server API Error: ${message}` }));
+              }
+            } else if (url.startsWith('/api/diagnose-check-test')) {
+              try {
+                await diagnoseCheckTestHandler(req, res);
               } catch (err) {
                 const message = err instanceof Error ? err.message : String(err);
                 res.statusCode = 500;

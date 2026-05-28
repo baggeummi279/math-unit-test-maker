@@ -1,7 +1,7 @@
 import { IncomingMessage, ServerResponse } from 'http';
-import type { ExamFormInputs } from '../src/types';
+import type { GradeLevel } from '../src/types';
 
-interface AssessmentRequest extends IncomingMessage {
+interface CheckTestRequest extends IncomingMessage {
   body?: Record<string, unknown>;
 }
 
@@ -14,7 +14,7 @@ interface OpenAIResponse {
 }
 
 // Helper to parse POST body stream in Node.js (handles stream buffers from Vite Connect)
-async function getRequestBody(req: AssessmentRequest): Promise<Record<string, unknown>> {
+async function getRequestBody(req: CheckTestRequest): Promise<Record<string, unknown>> {
   if (req.body) {
     return req.body;
   }
@@ -32,7 +32,7 @@ async function getRequestBody(req: AssessmentRequest): Promise<Record<string, un
   });
 }
 
-export default async function handler(req: AssessmentRequest, res: ServerResponse) {
+export default async function handler(req: CheckTestRequest, res: ServerResponse) {
   // CORS Headers support
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -62,8 +62,8 @@ export default async function handler(req: AssessmentRequest, res: ServerRespons
       return;
     }
 
-    const body = (await getRequestBody(req)) as unknown as ExamFormInputs;
-    const { gradeLevel, unitName, concepts, standard, questionCount, difficulty, questionTypeRatio, purpose } = body;
+    const body = (await getRequestBody(req));
+    const { gradeLevel, unitName, concepts } = body as { gradeLevel: GradeLevel; unitName: string; concepts: string };
 
     const gradeMap: Record<string, string> = {
       elementary: '초등학교',
@@ -71,21 +71,16 @@ export default async function handler(req: AssessmentRequest, res: ServerRespons
       high: '고등학교'
     };
 
-    const systemPrompt = `당신은 수학 교육과정 평가원 소속의 수학교육 전문가이자 출제 위원입니다.
-수학교사와 예비교사가 요청한 학년, 단원, 세부 개념, 성취기준, 평가 목적에 완전히 부합하는 최상의 단원평가 문항 세트를 설계해야 합니다.
+    const systemPrompt = `당신은 수학교육 전문가이자 평가 설계 위원입니다.
+학생이 정식 단원평가를 치르기 전에, 해당 단원의 핵심적인 취약점을 진단하기 위한 "3~5문항의 체크테스트"를 설계해야 합니다.
 
 출제 조건:
-1. 학년: ${gradeMap[gradeLevel] || '초등학교'} 과정에 완벽히 정렬된 문항 출제
+1. 학년: ${gradeMap[gradeLevel] || '초등학교'} 과정에 부합하는 문제
 2. 단원: ${unitName || '종합 단원'}
 3. 세부 개념: ${concepts || '해당 단원 핵심 개념'}
-4. 성취기준: ${standard || '기본 교육과정 성취기준'}
-5. 문항 수: ${questionCount || 5}개
-6. 난이도 비율: 쉬움 ${difficulty?.easy || 30}%, 보통 ${difficulty?.medium || 40}%, 어려움 ${difficulty?.hard || 30}% (이에 맞춰 문항 난이도를 분배)
-7. 문항 유형 비율: 객관식 ${questionTypeRatio?.choice || 40}%, 단답형 ${questionTypeRatio?.short || 40}%, 서술형 ${questionTypeRatio?.essay || 20}% (이에 맞춰 문항 형태를 분배)
-8. 평가 목적: ${purpose || '형성평가 및 오개념 진정성 파악'}
 
 문항 설계 규칙:
-1. 문항 텍스트, 보기, 정답, 해설, 예상 오개념 분석 등 모든 출력 항목은 반드시 표준 한국어만을 사용하여 작성하십시오. 영어 단어나 영어 수학 용어의 사용을 엄격히 금지합니다.
+1. 문항 텍스트, 보기, 정답, 세부 개념명 등 모든 출력 항목은 반드시 표준 한국어만을 사용하여 작성하십시오. 영어 단어나 영어 수학 용어의 사용을 엄격히 금지합니다.
 2. 모든 수학 용어는 반드시 정식 한국어 명칭으로 기술하십시오. 다음은 필수 매핑 번역 예시입니다:
    - improper fraction -> 가분수
    - mixed number -> 대분수
@@ -100,15 +95,16 @@ export default async function handler(req: AssessmentRequest, res: ServerRespons
    - equation -> 방정식
    - expression -> 식
    - graph -> 그래프
-3. 문항 텍스트는 표준 한국어로 명확하고 친절한 교수학습용 톤앤매너를 유지하세요.
-4. 수식 표기 시 LaTeX($ 기호)를 절대 사용하지 말고, 유니코드 특수 문자(×, ÷, ≤, ≥, ≠, ⇒, ², ³, ⁴, ⁵, ⁶, ⁷, ⁸, ⁹, ˣ, ʸ, ᵃ, ᵇ, ᶜ 등)를 직접 사용하여 자연스럽게 텍스트 분모/분자 형태로 작성해 주세요. (예: '2/7', '2³ × 3² × 5ˣ', 'x + y = 4')
-5. 각 문항은 다음 속성을 충실히 포함해야 합니다:
-   - question: 지문 및 문제 (세로 분수는 standard inline 문자형태인 A/B 로 표기)
-   - choices: 객관식(선다형)일 경우 5개 보기를 ①, ②, ③, ④, ⑤ 기호로 시작하는 텍스트로 채우고, 단답형 및 서술형의 경우 빈 배열 []로 채우세요.
-   - answer: 명확한 정답 (예: '② 5/7', '3', 'x = 10')
-   - solution: 상세하고 학문적으로 친절한 단계별 풀이 및 해설
-   - misconception: 이 문제를 해결할 때 학생들이 저지르기 쉬운 구체적인 인지적 오류(오개념)에 대한 분석 및 교사의 처방 가이드
-6. teacherNotes에는 평가 전체에 대한 교육학적 출제 의도, 난이도 분포 평가, 후속 처방 제안 등 교사를 위한 정밀한 피드백 코멘트를 1~3문장 이내의 배열 형태로 작성하세요.`;
+3. 체크테스트는 반드시 객관식 5지선다(선택지 5개)로만 출제해야 합니다. 단답형, 서술형, 빈칸형 문항은 절대로 출제하지 마십시오.
+4. 문항 수는 반드시 3~5개 사이로 생성하세요.
+5. 수식 표기 시 LaTeX($ 기호)를 절대 사용하지 말고, 유니코드 특수 문자(×, ÷, ≤, ≥, ≠, ⇒, ², ³, ⁴, ⁵, ⁶, ⁷, ⁸, ⁹, ˣ, ʸ, ᵃ, ᵇ, ᶜ 등)를 직접 사용하여 자연스럽게 텍스트 분모/분자 형태로 작성해 주세요. (예: '2/7', '2³ × 3² × 5ˣ', 'x + y = 4')
+6. 각 문항은 다음 속성을 충실히 포함해야 합니다:
+   - number: 1부터 시작하는 순차적인 정수
+   - concept: 이 문항이 테스트하는 세부 수학 개념 (예: "대분수와 대분수의 덧셈", "최대공약수 구하기")
+   - question: 문제 내용 (LaTeX 금지, 분수는 inline A/B 형태로 표기)
+   - choices: 반드시 ①, ②, ③, ④, ⑤ 기호로 시작하는 정확히 5개의 선택지 텍스트를 채우십시오. (예: ["① 1/5", "② 2/5", "③ 3/5", "④ 4/5", "⑤ 1"])
+   - answer: 5개 선택지(choices) 중 하나와 기호 및 내용이 완전히 동일한 정답 텍스트를 채우십시오. (예: choices에 "② 2/5"가 있다면, answer도 반드시 "② 2/5"여야 함. 단순 "②" 또는 다른 포맷은 피하십시오.)
+`;
 
     const openAiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -125,35 +121,29 @@ export default async function handler(req: AssessmentRequest, res: ServerRespons
         response_format: {
           type: 'json_schema',
           json_schema: {
-            name: 'assessment_generation',
+            name: 'check_test_generation',
             strict: true,
             schema: {
               type: 'object',
               properties: {
                 title: { type: 'string' },
-                goals: { type: 'array', items: { type: 'string' } },
                 questions: {
                   type: 'array',
                   items: {
                     type: 'object',
                     properties: {
                       number: { type: 'integer' },
-                      difficulty: { type: 'string', enum: ['쉬움', '보통', '어려움'] },
-                      type: { type: 'string', enum: ['객관식', '단답형', '서술형'] },
                       concept: { type: 'string' },
                       question: { type: 'string' },
                       choices: { type: 'array', items: { type: 'string' } },
-                      answer: { type: 'string' },
-                      solution: { type: 'string' },
-                      misconception: { type: 'string' }
+                      answer: { type: 'string' }
                     },
-                    required: ['number', 'difficulty', 'type', 'concept', 'question', 'choices', 'answer', 'solution', 'misconception'],
+                    required: ['number', 'concept', 'question', 'choices', 'answer'],
                     additionalProperties: false
                   }
-                },
-                teacherNotes: { type: 'array', items: { type: 'string' } }
+                }
               },
-              required: ['title', 'goals', 'questions', 'teacherNotes'],
+              required: ['title', 'questions'],
               additionalProperties: false
             }
           }
