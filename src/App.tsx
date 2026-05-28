@@ -118,6 +118,30 @@ function MixedFraction({ whole, numerator, denominator }: { whole: string; numer
   );
 }
 
+// Helper to normalize power representations and multiplication symbols for aesthetic display
+function normalizeMathText(text: string | undefined): string {
+  if (!text) return '';
+  let processed = text;
+
+  // 1. Power representation conversion
+  // Matches base (letters/digits) ^ {optional exponent digits} optional }
+  // e.g. x^2 -> x², x^{2} -> x², 2^{3} -> 2³
+  const superscripts: Record<string, string> = {
+    '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴',
+    '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹'
+  };
+
+  processed = processed.replace(/([a-zA-Z0-9])\^\{?([0-9])\}?/g, (_match, base, exp) => {
+    return base + (superscripts[exp] || exp);
+  });
+
+  // 2. Multiplication representation conversion
+  // Replace '*' between numbers, letters, or superscript digits with a beautiful ' × ' (cross sign)
+  processed = processed.replace(/([a-zA-Z0-9⁰-⁹])\s*\*\s*([a-zA-Z0-9])/g, '$1 × $2');
+
+  return processed;
+}
+
 interface MathTextProps {
   text: string | undefined;
 }
@@ -131,7 +155,10 @@ function MathText({ text }: MathTextProps) {
   // 2. Fix literal newline characters
   let cleanedText = translatedText.replace(/\\n/g, '\n');
 
-  // 3. Unify fractions into secure tokens
+  // 3. Normalize math expressions (powers and multiplication symbols)
+  cleanedText = normalizeMathText(cleanedText);
+
+  // 4. Unify fractions into secure tokens
   cleanedText = preprocessFractionTokens(cleanedText);
 
   // 4. Split and render 교차 (cross-render) tokens next to standard text
@@ -189,7 +216,7 @@ function cleanOptionText(text: string | undefined): string {
 
 function App() {
   // --- Active Tab State ('direct' = 수동 출제, 'diagnosis' = 체크테스트 진단) ---
-  const [activeTab, setActiveTab] = useState<'direct' | 'diagnosis'>('direct');
+  const [activeTab, setActiveTab] = useState<'direct' | 'diagnosis'>('diagnosis');
   const [showAppliedBanner, setShowAppliedBanner] = useState(false);
 
   // --- Form States (Default to Elementary Fractional Arithmetic) ---
@@ -641,17 +668,17 @@ interface GPTResponse {
         <div className="mode-tabs">
           <button
             type="button"
-            className={`mode-tab-btn ${activeTab === 'direct' ? 'active' : ''}`}
-            onClick={() => setActiveTab('direct')}
-          >
-            ⚙️ 직접 조건 설정
-          </button>
-          <button
-            type="button"
             className={`mode-tab-btn ${activeTab === 'diagnosis' ? 'active' : ''}`}
             onClick={() => setActiveTab('diagnosis')}
           >
             🔍 체크테스트로 진단
+          </button>
+          <button
+            type="button"
+            className={`mode-tab-btn ${activeTab === 'direct' ? 'active' : ''}`}
+            onClick={() => setActiveTab('direct')}
+          >
+            ⚙️ 직접 조건 설정
           </button>
         </div>
       </div>
