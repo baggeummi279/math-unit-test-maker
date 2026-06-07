@@ -1,5 +1,6 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -18,14 +19,17 @@ export const isFirebaseConfigured = !!(
 );
 
 let dbInstance = null;
+let authInstance = null;
 
 if (isFirebaseConfigured) {
   try {
     const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
     dbInstance = getFirestore(app);
+    authInstance = getAuth(app);
   } catch (error) {
-    console.error('Failed to initialize Firebase app or Firestore:', error);
+    console.error('Failed to initialize Firebase app, Firestore or Auth:', error);
   }
 }
 
 export const db = dbInstance;
+export const auth = authInstance;

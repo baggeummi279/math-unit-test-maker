@@ -116,8 +116,17 @@ OpenAI API를 안전하게 사용하기 위해 프로젝트 루트 디렉토리�
 
 ---
 
-## 🔒 7. Firestore 보안 규칙 설정 (Security Rules)
-본 프로젝트는 초기 단계로 Firebase Authentication을 연동하지 않고 Firestore 데이터베이스만 사용하므로, 외부에서 체크테스트 결과 및 생성된 단원평가를 저장하고 조회할 수 있도록 규칙을 구성해야 합니다.
+## 🔒 7. Firebase Authentication & Firestore 보안 규칙 설정 (Security Rules)
+
+교사 모드 모니터링 기능을 사용하기 위해서는 Firebase Authentication에서 이메일/비밀번호 로그인을 활성화하고 Firestore 보안 규칙을 안전하게 구성해야 합니다.
+
+### 1) Firebase Authentication 이메일 로그인 활성화
+1. **Firebase Console** -> **Build** -> **Authentication**으로 이동합니다.
+2. **Sign-in method** 탭에서 **새 제공업체 추가(Add new provider)**를 클릭하고 **이메일/비밀번호(Email/Password)**를 활성화(Enable) 및 저장합니다.
+3. **Users** 탭에서 **사용자 추가(Add user)** 버튼을 눌러 교사용 이메일과 비밀번호를 수동으로 등록합니다.
+
+### 2) Firestore 보안 규칙 (Security Rules) 설정
+교사로 인증된 사용자(로그인한 사용자)만 학생들의 평가 결과 기록을 조회(read)하고 수정/삭제할 수 있도록 하고, 게스트 학생들은 평가 결과를 생성(create)만 할 수 있도록 규칙을 다음과 같이 적용합니다.
 
 Firebase Console의 Firestore Database -> **규칙(Rules)** 탭에서 아래와 같이 보안 규칙을 적용해 주세요.
 
@@ -127,18 +136,23 @@ service cloud.firestore {
   match /databases/{database}/documents {
     // 단원평가 저장소 컬렉션 규칙
     match /assessments/{document} {
-      allow read, write: if true;
+      allow read: if request.auth != null;
+      allow create: if true;
+      allow update, delete: if request.auth != null;
     }
     // 사전 체크테스트 결과 저장소 컬렉션 규칙
     match /checkTestResults/{document} {
-      allow read, write: if true;
+      allow read: if request.auth != null;
+      allow create: if true;
+      allow update, delete: if request.auth != null;
     }
   }
 }
 ```
 
-> ⚠️ **보안 경고 (Security Caution)**
-> - 위 규칙은 테스트 및 프로토타입 검증용입니다. 인증되지 않은 누구나 데이터를 읽고 쓸 수 있으므로 실제 서비스 배포 시에는 Firebase Authentication을 연동하여 소유자만 쓰기/읽기가 가능하도록 보안 규칙을 고도화해야 합니다.
+> ⚠️ **보안 및 접근 제어 안내 (Security Guidelines)**
+> - 위 설정은 학생(비인증 사용자)이 생성한 답안 데이터를 Firestore에 저장(create)할 수 있도록 허용하면서도, 외부 악의적 사용자가 학생들의 평가 데이터를 무단으로 조회(read)하거나 훼손하는 행위를 완벽히 방단합니다.
+> - 교사 대시보드는 로그인 성공 시 생성되는 `request.auth` 객체를 기반으로 보안성 높게 동작합니다.
 
 ---
 

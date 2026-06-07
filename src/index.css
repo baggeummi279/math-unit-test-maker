@@ -1974,5 +1974,202 @@ body {
   gap: 0.5rem;
 }
 
+/* Teacher Login UI Styling */
+.login-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 60vh;
+  padding: 2rem;
+  width: 100%;
+}
+
+.login-card {
+  background-color: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  width: 100%;
+  max-width: 450px;
+  padding: 2.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  animation: scaleUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.login-header {
+  text-align: center;
+}
+
+.login-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.login-subtitle {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.login-error-box {
+  background-color: var(--color-hard-bg);
+  border: 1px solid var(--color-hard-border);
+  color: var(--color-hard);
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  font-weight: 500;
+  animation: shake 0.5s ease-in-out;
+}
+
+.login-submit-btn {
+  font-family: var(--font-sans);
+  background: linear-gradient(135deg, var(--primary), hsl(var(--hue), 85%, 65%));
+  color: var(--text-light);
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 0.85rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  box-shadow: var(--shadow-glow);
+  outline: none;
+  width: 100%;
+}
+
+.login-submit-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px -4px hsla(var(--hue), 80%, 56%, 0.3);
+}
+
+.login-submit-btn:disabled {
+  background: var(--text-muted);
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+/* Teacher Dashboard Dashboard Styling */
+.dashboard-header-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 2px solid var(--border);
+  padding-bottom: 1rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.dashboard-title-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.dashboard-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.dashboard-subtitle {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+/* Analytics Weak Concepts Bar Chart */
+.analytics-card {
+  background-color: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 1.75rem;
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.analytics-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-bottom: 1px dashed var(--border);
+  padding-bottom: 0.75rem;
+}
+
+.stats-bars-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.stats-bar-row {
+  display: grid;
+  grid-template-columns: 180px 1fr 60px;
+  align-items: center;
+  gap: 1rem;
+}
+
+@media (max-width: 600px) {
+  .stats-bar-row {
+    grid-template-columns: 1fr;
+    gap: 0.25rem;
+    align-items: flex-start;
+  }
+  .stats-bar-value {
+    text-align: left !important;
+  }
+}
+
+.stats-bar-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stats-bar-track {
+  background-color: var(--bg-input);
+  border-radius: 6px;
+  height: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  position: relative;
+  width: 100%;
+}
+
+.stats-bar-fill {
+  background: linear-gradient(90deg, var(--primary), var(--border-focus));
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.stats-bar-value {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--primary);
+  text-align: right;
+}
+
 
 

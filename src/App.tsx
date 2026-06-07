@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import type { ExamDraft, GradeLevel, RatioValues, TypeRatioValues, CheckTestDraft, DiagnosisResult } from './types';
-import { db, isFirebaseConfigured } from './lib/firebase';
+import { db, isFirebaseConfigured, auth } from './lib/firebase';
 import { collection, addDoc, getDocs, query, orderBy, limit } from 'firebase/firestore';
+import { signInWithEmailAndPassword, signOut, onAuthStateChanged, type User } from 'firebase/auth';
 
 // Fail-safe helper to translate English math terminology into standard Korean
 function translateMathTerms(text: string | undefined): string {
@@ -897,6 +898,22 @@ function App() {
   const [diagGrade, setDiagGrade] = useState('1학년');
   const [diagSemester, setDiagSemester] = useState('2학기');
 
+  // --- Teacher Mode & Authentication States ---
+  const [isTeacherMode, setIsTeacherMode] = useState(false);
+  const [teacherUser, setTeacherUser] = useState<User | null>(null);
+  const [teacherEmail, setTeacherEmail] = useState('');
+  const [teacherPassword, setTeacherPassword] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [monitoringAssessments, setMonitoringAssessments] = useState<any[]>([]);
+  const [monitoringCheckTests, setMonitoringCheckTests] = useState<any[]>([]);
+  const [isLoadingMonitoringData, setIsLoadingMonitoringData] = useState(false);
+
+  // --- Teacher Dashboard Filter States ---
+  const [filterSchoolLevel, setFilterSchoolLevel] = useState<string>('all');
+  const [filterGrade, setFilterGrade] = useState<string>('all');
+  const [filterSearchQuery, setFilterSearchQuery] = useState<string>('');
+
   // --- Validation ---
   const difficultySum = difficulty.easy + difficulty.medium + difficulty.hard;
   const typeSum = questionTypeRatio.choice + questionTypeRatio.short + questionTypeRatio.essay;
@@ -1570,6 +1587,97 @@ interface GPTResponse {
     }
   };
 
+  // --- Teacher Mode Authentication & Monitoring Handlers ---
+
+  useEffect(() => {
+    if (!auth) return;
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setTeacherUser(user);
+      if (user) {
+        fetchMonitoringData();
+      } else {
+        setMonitoringAssessments([]);
+        setMonitoringCheckTests([]);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const fetchMonitoringData = async () => {
+    if (!db) return;
+    setIsLoadingMonitoringData(true);
+    try {
+      const assessmentsRef = collection(db, 'assessments');
+      const checkTestsRef = collection(db, 'checkTestResults');
+      
+      const qAssessments = query(assessmentsRef, orderBy('createdAt', 'desc'));
+      const qCheckTests = query(checkTestsRef, orderBy('createdAt', 'desc'));
+      
+      const [assessmentsSnap, checkTestsSnap] = await Promise.all([
+        getDocs(qAssessments),
+        getDocs(qCheckTests)
+      ]);
+      
+      const assessmentsList = assessmentsSnap.docs.map(doc => ({
+        id: doc.id,
+        type: 'assessment',
+        ...doc.data()
+      }));
+      
+      const checkTestsList = checkTestsSnap.docs.map(doc => ({
+        id: doc.id,
+        type: 'checktest',
+        ...doc.data()
+      }));
+      
+      setMonitoringAssessments(assessmentsList);
+      setMonitoringCheckTests(checkTestsList);
+    } catch (error) {
+      console.error('Failed to fetch monitoring data:', error);
+      triggerToast(`❌ 모니터링 데이터 조회 실패: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setIsLoadingMonitoringData(false);
+    }
+  };
+
+  const handleTeacherLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!auth) {
+      setLoginError('Firebase 환경변수가 설정되지 않았습니다.');
+      return;
+    }
+    setIsLoggingIn(true);
+    setLoginError(null);
+    try {
+      await signInWithEmailAndPassword(auth, teacherEmail, teacherPassword);
+      triggerToast('🔑 교사용 계정으로 로그인 성공!');
+      setTeacherEmail('');
+      setTeacherPassword('');
+    } catch (error: any) {
+      console.error('Login error:', error);
+      let errMsg = '로그인에 실패했습니다. 이메일과 비밀번호를 확인해 주세요.';
+      if (error.code === 'auth/invalid-email') {
+        errMsg = '올바르지 않은 이메일 형식입니다.';
+      } else if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+        errMsg = '이메일 또는 비밀번호가 일치하지 않습니다.';
+      }
+      setLoginError(errMsg);
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  const handleTeacherLogout = async () => {
+    if (!auth) return;
+    try {
+      await signOut(auth);
+      triggerToast('🔒 로그아웃되었습니다.');
+    } catch (error) {
+      console.error('Logout error:', error);
+      triggerToast('❌ 로그아웃 중 오류가 발생했습니다.');
+    }
+  };
+
   const stepsText = [
     '교육과정 성취기준 및 단원 핵심요소 분석 중...',
     '교수평가 오개념 빅데이터 대조 및 문제설계 중...',
@@ -1583,13 +1691,91 @@ interface GPTResponse {
     high: '고등학교'
   };
 
+  // --- Teacher Dashboard Filter Calculations ---
+  const uniqueGrades = Array.from(
+    new Set([
+      ...monitoringAssessments.map(a => a.grade),
+      ...monitoringCheckTests.map(c => c.grade)
+    ].filter(Boolean))
+  );
+
+  const filterRecords = (list: any[]) => {
+    return list.filter(item => {
+      // 1. School Level Filter
+      if (filterSchoolLevel !== 'all' && item.schoolLevel !== filterSchoolLevel) {
+        return false;
+      }
+      // 2. Grade Filter
+      if (filterGrade !== 'all' && item.grade !== filterGrade) {
+        return false;
+      }
+      // 3. Search Query (Unit / Concepts)
+      if (filterSearchQuery.trim()) {
+        const query = filterSearchQuery.toLowerCase();
+        const unitMatch = item.unit && item.unit.toLowerCase().includes(query);
+        const conceptMatch = item.concepts && item.concepts.toLowerCase().includes(query);
+        return unitMatch || conceptMatch;
+      }
+      return true;
+    });
+  };
+
+  const filteredAssessments = filterRecords(monitoringAssessments);
+  const filteredCheckTests = filterRecords(monitoringCheckTests);
+
+  const getWeakConceptsStats = (checkTests: any[]) => {
+    const conceptCounts: Record<string, number> = {};
+    checkTests.forEach((record) => {
+      if (Array.isArray(record.weakConcepts)) {
+        record.weakConcepts.forEach((concept: string) => {
+          if (concept && concept.trim()) {
+            conceptCounts[concept] = (conceptCounts[concept] || 0) + 1;
+          }
+        });
+      }
+    });
+
+    return Object.entries(conceptCounts)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5); // TOP 5
+  };
+
+  const topWeakConcepts = getWeakConceptsStats(filteredCheckTests);
+
   return (
     <>
       {/* Header */}
-      <header className="app-header">
-        <div className="app-logo">
-          <div className="app-logo-icon">f(x)</div>
-          <h1 className="app-logo-text">수학 단원평가 제작소</h1>
+      <header className="app-header no-print">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: '1rem' }}>
+          <div className="app-logo">
+            <div className="app-logo-icon">f(x)</div>
+            <h1 className="app-logo-text">수학 단원평가 제작소</h1>
+          </div>
+          <div>
+            <button
+              type="button"
+              className="btn-history-trigger"
+              style={{
+                padding: '0.6rem 1.2rem',
+                fontSize: '0.9rem',
+                fontWeight: '600',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--border)',
+                backgroundColor: isTeacherMode ? 'var(--primary-glow)' : 'var(--bg-panel)',
+                color: isTeacherMode ? 'var(--primary)' : 'var(--text-secondary)',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                transition: 'var(--transition)',
+                boxShadow: 'var(--shadow-sm)'
+              }}
+              onClick={() => setIsTeacherMode(!isTeacherMode)}
+            >
+              {isTeacherMode ? '🏫 학생 모드로 돌아가기' : '💼 교사 모드'}
+            </button>
+          </div>
         </div>
         <p className="app-description">
           수학 교육과정 성취기준과 오개념 빅데이터에 근거하여, 교사 및 예비교사를 위한 최적의 수학 단원평가 문항과 교수학습 처방 해설지를 맞춤 설계해 드립니다.
@@ -1603,8 +1789,10 @@ interface GPTResponse {
         </div>
       )}
 
-      {/* Mode Switcher Tabs */}
-      <div className="mode-tabs-container">
+      {!isTeacherMode ? (
+        <>
+          {/* Mode Switcher Tabs */}
+          <div className="mode-tabs-container">
         <div className="mode-tabs">
           <button
             type="button"
@@ -2792,6 +2980,275 @@ interface GPTResponse {
           📋 저장된 기록 보기
         </button>
       </div>
+        </>
+      ) : (
+        /* Teacher Mode Content */
+        !teacherUser ? (
+          <div className="login-container">
+            <form className="login-card" onSubmit={handleTeacherLogin}>
+              <div className="login-header">
+                <h2 className="login-title">💼 교사 모드 로그인</h2>
+                <p className="login-subtitle">등록된 이메일과 비밀번호로 로그인해주세요.</p>
+              </div>
+              
+              {loginError && <div className="login-error-box">{loginError}</div>}
+              
+              <div className="form-group">
+                <label className="form-label" htmlFor="teacher-email">이메일 주소</label>
+                <input
+                  id="teacher-email"
+                  type="email"
+                  className="input-text"
+                  placeholder="teacher@example.com"
+                  value={teacherEmail}
+                  onChange={(e) => setTeacherEmail(e.target.value)}
+                  required
+                />
+              </div>
+              
+              <div className="form-group">
+                <label className="form-label" htmlFor="teacher-password">비밀번호</label>
+                <input
+                  id="teacher-password"
+                  type="password"
+                  className="input-text"
+                  placeholder="••••••••"
+                  value={teacherPassword}
+                  onChange={(e) => setTeacherPassword(e.target.value)}
+                  required
+                />
+              </div>
+              
+              <button type="submit" className="login-submit-btn" disabled={isLoggingIn}>
+                {isLoggingIn ? '로그인 중...' : '로그인'}
+              </button>
+            </form>
+          </div>
+        ) : (
+          <div className="dashboard-container" style={{ padding: '0 1.5rem 2.5rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem', maxWidth: '1200px', margin: '0 auto' }}>
+            <div className="dashboard-header-bar">
+              <div className="dashboard-title-info">
+                <h2 className="dashboard-title">💼 교사 모니터링 대시보드</h2>
+                <p className="dashboard-subtitle">
+                  학생들이 제출한 체크테스트 결과와 생성된 단원평가 목록을 모니터링합니다.
+                </p>
+              </div>
+              <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                  👤 {teacherUser.email}
+                </span>
+                <button
+                  type="button"
+                  className="btn-history-trigger"
+                  style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}
+                  onClick={handleTeacherLogout}
+                >
+                  🔒 로그아웃
+                </button>
+              </div>
+            </div>
+
+            {/* TOP 5 Weak Concepts Analytics Card */}
+            <div className="analytics-card">
+              <h3 className="analytics-title">📊 가장 많이 겪는 오개념 / 부족 개념 TOP 5 (실시간 진단 반영)</h3>
+              {topWeakConcepts.length === 0 ? (
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem', textAlign: 'center', padding: '2rem 1rem' }}>
+                  진단 데이터가 부족하거나 필터링된 결과가 없습니다.
+                </div>
+              ) : (
+                <div className="stats-bars-container">
+                  {topWeakConcepts.map((item) => {
+                    const total = filteredCheckTests.length || 1;
+                    const pct = Math.round((item.count / total) * 100);
+                    return (
+                      <div key={item.name} className="stats-bar-row">
+                        <div className="stats-bar-label" title={item.name}>{item.name}</div>
+                        <div className="stats-bar-track">
+                          <div className="stats-bar-fill" style={{ width: `${pct}%` }}></div>
+                        </div>
+                        <div className="stats-bar-value">{item.count}회 ({pct}%)</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Filter Bar */}
+            <div className="filter-bar" style={{
+              display: 'flex',
+              gap: '1rem',
+              flexWrap: 'wrap',
+              backgroundColor: 'var(--bg-panel)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-sm)',
+              padding: '1rem',
+              alignItems: 'center'
+            }}>
+              <div className="form-group" style={{ margin: 0, flex: 1, minWidth: '150px' }}>
+                <label className="form-label" style={{ fontSize: '0.8rem', marginBottom: '0.25rem' }}>학교급</label>
+                <select
+                  className="input-text"
+                  style={{ padding: '0.4rem 0.6rem', height: 'auto', fontSize: '0.85rem' }}
+                  value={filterSchoolLevel}
+                  onChange={(e) => setFilterSchoolLevel(e.target.value)}
+                >
+                  <option value="all">전체 학교급</option>
+                  <option value="elementary">초등학교</option>
+                  <option value="middle">중학교</option>
+                  <option value="high">고등학교</option>
+                </select>
+              </div>
+              
+              <div className="form-group" style={{ margin: 0, flex: 1, minWidth: '150px' }}>
+                <label className="form-label" style={{ fontSize: '0.8rem', marginBottom: '0.25rem' }}>학년/과목</label>
+                <select
+                  className="input-text"
+                  style={{ padding: '0.4rem 0.6rem', height: 'auto', fontSize: '0.85rem' }}
+                  value={filterGrade}
+                  onChange={(e) => setFilterGrade(e.target.value)}
+                >
+                  <option value="all">전체 학년/과목</option>
+                  {uniqueGrades.map((g: any) => (
+                    <option key={g} value={g}>{g}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group" style={{ margin: 0, flex: 2, minWidth: '200px' }}>
+                <label className="form-label" style={{ fontSize: '0.8rem', marginBottom: '0.25rem' }}>단원 및 개념 검색</label>
+                <input
+                  type="text"
+                  className="input-text"
+                  style={{ padding: '0.4rem 0.6rem', height: 'auto', fontSize: '0.85rem' }}
+                  placeholder="단원명 또는 개념 검색..."
+                  value={filterSearchQuery}
+                  onChange={(e) => setFilterSearchQuery(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Monitoring Lists (Side-by-side or stacked grid) */}
+            {isLoadingMonitoringData ? (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '5rem' }}>
+                <div className="math-ripple-loader">
+                  <div></div>
+                  <div></div>
+                </div>
+              </div>
+            ) : (
+              <div className="history-records-grid">
+                {/* Left Column: Assessments */}
+                <div className="history-records-column">
+                  <h4 className="history-column-title">
+                    📄 단원평가 기록 ({filteredAssessments.length}개)
+                  </h4>
+                  {filteredAssessments.length === 0 ? (
+                    <div style={{ padding: '3rem 1rem', textAlign: 'center', color: 'var(--text-muted)', border: '1px dashed var(--border)', borderRadius: 'var(--radius-sm)' }}>
+                      조회된 단원평가가 없습니다.
+                    </div>
+                  ) : (
+                    <div className="history-records-list">
+                      {filteredAssessments.map((record) => {
+                        const dateStr = new Date(record.createdAt).toLocaleString('ko-KR', {
+                          year: 'numeric',
+                          month: '2-digit',
+                          day: '2-digit',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        });
+                        const levelKo = record.schoolLevel === 'elementary' ? '초등' : record.schoolLevel === 'middle' ? '중등' : '고등';
+                        return (
+                          <div
+                            key={record.id}
+                            className="history-record-card"
+                            onClick={() => {
+                              setSelectedHistoryRecord(record);
+                              setShowHistoryDetailModal(true);
+                            }}
+                          >
+                            <div className="history-record-info">
+                              <div className="history-record-meta">
+                                <span className="history-type-badge assessment">단원평가</span>
+                                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                                  {levelKo} | {record.grade} {record.semester}
+                                </span>
+                              </div>
+                              <div className="history-record-unit">{record.unit}</div>
+                              <div className="history-record-details-row">
+                                <span>개념: {record.concepts}</span>
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <span className="history-record-date">{dateStr}</span>
+                              <span className="history-record-action-arrow">➔</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Right Column: Checktests */}
+                <div className="history-records-column">
+                  <h4 className="history-column-title">
+                    🧪 체크테스트 기록 ({filteredCheckTests.length}개)
+                  </h4>
+                  {filteredCheckTests.length === 0 ? (
+                    <div style={{ padding: '3rem 1rem', textAlign: 'center', color: 'var(--text-muted)', border: '1px dashed var(--border)', borderRadius: 'var(--radius-sm)' }}>
+                      조회된 체크테스트 결과가 없습니다.
+                    </div>
+                  ) : (
+                    <div className="history-records-list">
+                      {filteredCheckTests.map((record) => {
+                        const dateStr = new Date(record.createdAt).toLocaleString('ko-KR', {
+                          year: 'numeric',
+                          month: '2-digit',
+                          day: '2-digit',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        });
+                        const levelKo = record.schoolLevel === 'elementary' ? '초등' : record.schoolLevel === 'middle' ? '중등' : '고등';
+                        return (
+                          <div
+                            key={record.id}
+                            className="history-record-card"
+                            onClick={() => {
+                              setSelectedHistoryRecord(record);
+                              setShowHistoryDetailModal(true);
+                            }}
+                          >
+                            <div className="history-record-info">
+                              <div className="history-record-meta">
+                                <span className="history-type-badge checktest">체크테스트</span>
+                                <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                                  {levelKo} | {record.grade} {record.semester}
+                                </span>
+                              </div>
+                              <div className="history-record-unit">{record.unit}</div>
+                              <div className="history-record-details-row">
+                                <span>개념: {record.concepts}</span>
+                                <span style={{ color: 'var(--primary)', fontWeight: 600 }}>
+                                  점수: {record.score} / {record.totalQuestions}
+                                </span>
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <span className="history-record-date">{dateStr}</span>
+                              <span className="history-record-action-arrow">➔</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )
+      )}
 
       {/* History Records List Modal */}
       {showHistoryModal && (
