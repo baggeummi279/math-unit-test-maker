@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { ExamDraft, GradeLevel, RatioValues, TypeRatioValues, CheckTestDraft, DiagnosisResult } from './types';
+import { db, isFirebaseConfigured } from './lib/firebase';
+import { collection, addDoc, getDocs, query, orderBy, limit } from 'firebase/firestore';
 
 // Fail-safe helper to translate English math terminology into standard Korean
 function translateMathTerms(text: string | undefined): string {
@@ -444,6 +446,375 @@ const getUnitsForSelection = (level: GradeLevel, grade: string, semester: string
   }
 };
 
+// --- History Sub-components for Saved Records Dialogs ---
+
+function HistoryAssessmentViewer({ exam }: { exam: ExamDraft }) {
+  const [viewMode, setViewMode] = useState<'student' | 'teacher'>('teacher');
+  const [studentGrade, setStudentGrade] = useState('');
+  const [studentNum, setStudentNum] = useState('');
+  const [studentName, setStudentName] = useState('');
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+
+  const triggerToast = (msg: string) => {
+    setToastMessage(msg);
+    setShowToast(true);
+  };
+
+  useEffect(() => {
+    if (showToast) {
+      const timer = setTimeout(() => setShowToast(false), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [showToast]);
+
+  const handleCopyText = () => {
+    let text = `=========================================\n`;
+    text += `   수학 단원평가 초안 - [${exam.title}]\n`;
+    text += `=========================================\n\n`;
+    text += `■ 학년/대상: ${exam.gradeText}\n`;
+    text += `■ 평가 단원: ${exam.unitName}\n`;
+    text += `■ 평가 목적: ${exam.purpose}\n`;
+    text += `■ 평가 목표: ${exam.objective}\n\n`;
+
+    if (viewMode === 'student') {
+      text += `-----------------------------------------\n`;
+      text += `              [ 학 생 용  문 제 지 ]\n`;
+      text += `-----------------------------------------\n`;
+      text += ` 학년: ______  반: ______  번호: ______  이름: ______\n\n`;
+
+      exam.questions.forEach((q) => {
+        text += `${q.number}번. [${q.type === 'choice' ? '객관식' : q.type === 'short' ? '단답형' : '서술형'}] (난이도: ${q.difficulty === 'easy' ? '쉬움' : q.difficulty === 'medium' ? '보통' : '어려움'})\n`;
+        text += `질문: ${q.question}\n`;
+        if (q.options && q.options.length > 0) {
+          q.options.forEach((opt, idx) => {
+            text += `  ${idx + 1}) ${opt}\n`;
+          });
+        }
+        text += `\n[답안 기재란]: _____________________________________\n\n`;
+      });
+    } else {
+      text += `-----------------------------------------\n`;
+      text += `              [ 교 사 용  정 답 지 ]\n`;
+      text += `-----------------------------------------\n\n`;
+
+      exam.questions.forEach((q) => {
+        text += `${q.number}번. [${q.type === 'choice' ? '객관식' : q.type === 'short' ? '단답형' : '서술형'}] (난이도: ${q.difficulty === 'easy' ? '쉬움' : q.difficulty === 'medium' ? '보통' : '어려움'})\n`;
+        text += `질문: ${q.question}\n`;
+        if (q.options && q.options.length > 0) {
+          q.options.forEach((opt, idx) => {
+            text += `  ${idx + 1}) ${opt}\n`;
+          });
+        }
+        text += `▶ [정답]: ${q.answer}\n`;
+        text += `▶ [해설]:\n${q.solution}\n`;
+        text += `▶ [예상 오개념 분석]:\n${q.expectedMisconception}\n`;
+        text += `-----------------------------------------\n\n`;
+      });
+
+      text += `-----------------------------------------\n`;
+      text += `            [ 문항별 정답 요약표 ]\n`;
+      text += `-----------------------------------------\n`;
+      text += `문항번호 |  문항유형  |  난이도  |  정답\n`;
+      exam.questions.forEach((q) => {
+        const typeKo = q.type === 'choice' ? '객관식' : q.type === 'short' ? '단답형' : '서술형';
+        const diffKo = q.difficulty === 'easy' ? '쉬움' : q.difficulty === 'medium' ? '보통' : '어려움';
+        text += `  ${String(q.number).padEnd(6)} |  ${typeKo.padEnd(6)} |  ${diffKo.padEnd(5)} |  ${q.answer}\n`;
+      });
+      text += `\n`;
+      text += `-----------------------------------------\n`;
+      text += `            [ 교사용 종합 검토 메모 ]\n`;
+      text += `-----------------------------------------\n`;
+      text += exam.teacherMemo + `\n`;
+    }
+
+    navigator.clipboard.writeText(text)
+      .then(() => {
+        triggerToast('📋 시험지가 클립보드에 복사되었습니다! (외부 문서에 붙여넣기 하세요)');
+      })
+      .catch(() => {
+        triggerToast('❌ 복사에 실패했습니다. 수동으로 복사해주세요.');
+      });
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: '1rem',
+        backgroundColor: 'var(--bg-panel)',
+        padding: '1rem',
+        borderRadius: 'var(--radius-sm)',
+        border: '1px solid var(--border)'
+      }}>
+        <div className="toggle-segment-control">
+          <button
+            type="button"
+            className={`toggle-segment-btn ${viewMode === 'student' ? 'active' : ''}`}
+            onClick={() => setViewMode('student')}
+          >
+            🎓 학생용 문제지 보기
+          </button>
+          <button
+            type="button"
+            className={`toggle-segment-btn ${viewMode === 'teacher' ? 'active' : ''}`}
+            onClick={() => setViewMode('teacher')}
+          >
+            💼 교사용 해설지 보기
+          </button>
+        </div>
+        <div className="utility-actions">
+          <button
+            type="button"
+            className="btn-utility"
+            onClick={handleCopyText}
+          >
+            📋 클립보드 복사
+          </button>
+          <button
+            type="button"
+            className="btn-utility primary"
+            onClick={() => window.print()}
+          >
+            🖨️ 시험지 인쇄 (PDF)
+          </button>
+        </div>
+      </div>
+
+      <div style={{ position: 'relative' }}>
+        <article className={`exam-worksheet ${viewMode === 'student' ? 'student-view' : 'teacher-view'}`} style={{ border: 'none', boxShadow: 'none', maxWidth: '100%', padding: '2rem 1.5rem' }}>
+          <div className="exam-meta-header">
+            <h2 className="exam-main-title">{exam.title}</h2>
+            <div className="student-info-grid">
+              <div className="student-info-cell label">과목</div>
+              <div className="student-info-cell">
+                <span style={{ fontWeight: 500 }}>수학</span>
+              </div>
+              <div className="student-info-cell label">학년/반</div>
+              <div className="student-info-cell">
+                <input
+                  type="text"
+                  placeholder="___학년 ___반"
+                  className="student-info-input"
+                  value={studentGrade}
+                  onChange={(e) => setStudentGrade(e.target.value)}
+                />
+              </div>
+              <div className="student-info-cell label">번호</div>
+              <div className="student-info-cell">
+                <input
+                  type="text"
+                  placeholder="___번"
+                  className="student-info-input"
+                  value={studentNum}
+                  onChange={(e) => setStudentNum(e.target.value)}
+                />
+              </div>
+              <div className="student-info-cell label">성명</div>
+              <div className="student-info-cell">
+                <input
+                  type="text"
+                  placeholder="이름"
+                  className="student-info-input"
+                  value={studentName}
+                  onChange={(e) => setStudentName(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="objective-card">
+            <div className="objective-title">🎯 평가 목표 및 의도</div>
+            <p className="objective-text">
+              <MathText text={exam.objective} />
+            </p>
+          </div>
+
+          <div className="questions-list">
+            {exam.questions.map((q) => {
+              const typeKo = q.type === 'choice' ? '객관식' : q.type === 'short' ? '단답형' : '서술형';
+              const diffKo = q.difficulty === 'easy' ? '하' : q.difficulty === 'medium' ? '중' : '상';
+
+              return (
+                <div key={q.id} className="question-item">
+                  <div className="question-text-row">
+                    <span className="question-number">{q.number}.</span>
+                    <div className="question-body-content">
+                      <MathText text={q.question} />
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: '0.5rem' }}>
+                        [{typeKo} | 난이도 {diffKo}]
+                      </span>
+                    </div>
+                  </div>
+
+                  {q.options && q.options.length > 0 && (
+                    <div className={`options-grid columns-${q.options.length === 5 ? '5' : '2'}`}>
+                      {q.options.map((option, idx) => (
+                        <div key={idx} className="option-item">
+                          <span style={{ fontWeight: 600, marginRight: '0.2rem' }}>{['①', '②', '③', '④', '⑤'][idx]}</span>
+                          <span><MathText text={cleanOptionText(option)} /></span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {viewMode === 'student' && (
+                    <div className="student-answer-space">
+                      ✍️ 정답 또는 풀이 기재란: __________________________________________________
+                    </div>
+                  )}
+
+                  {viewMode === 'teacher' && (
+                    <div className="teacher-solution-card">
+                      <div className="solution-header answer">
+                        <span>🔑 올바른 모범 정답</span>
+                      </div>
+                      <div className="solution-body" style={{ fontWeight: 700, color: 'var(--color-easy)' }}>
+                        <MathText text={q.answer} />
+                      </div>
+
+                      <div className="solution-header solution">
+                        <span>💡 풀이 과정 및 해설</span>
+                      </div>
+                      <div className="solution-body">
+                        <MathText text={q.solution} />
+                      </div>
+
+                      <div className="solution-header misconception">
+                        <span>⚠️ 예상 오개념 분석 & 피드백 방향</span>
+                      </div>
+                      <div className="solution-body" style={{ backgroundColor: 'var(--color-misconception-bg)', color: 'var(--color-misconception)', borderTop: '1px dashed var(--color-misconception-border)' }}>
+                        <MathText text={q.expectedMisconception} />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {viewMode === 'teacher' && (
+            <>
+              <div className="teacher-answer-grid-card" style={{ marginTop: '2rem' }}>
+                <h3 className="teacher-grid-title">📊 문항별 정답 신속 확인표</h3>
+                <table className="answer-table">
+                  <thead>
+                    <tr>
+                      <th>번호</th>
+                      <th>문항 유형</th>
+                      <th>난이도</th>
+                      <th>정답</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {exam.questions.map((q) => (
+                      <tr key={q.id}>
+                        <td><strong>{q.number}</strong></td>
+                        <td>{q.type === 'choice' ? '객관식' : q.type === 'short' ? '단답형' : '서술형'}</td>
+                        <td>
+                          <span style={{
+                            color: q.difficulty === 'easy' ? 'var(--color-easy)' : q.difficulty === 'medium' ? 'var(--color-medium)' : 'var(--color-hard)',
+                            fontWeight: 600
+                          }}>
+                            {q.difficulty === 'easy' ? '쉬움' : q.difficulty === 'medium' ? '보통' : '어려움'}
+                          </span>
+                        </td>
+                        <td className="correct"><MathText text={q.answer} /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="teacher-memo-card">
+                <h4 className="teacher-memo-title">🧠 교육학 전문가의 평가 설계 리뷰</h4>
+                <p className="teacher-memo-text">
+                  <MathText text={exam.teacherMemo} />
+                </p>
+              </div>
+            </>
+          )}
+        </article>
+      </div>
+
+      {showToast && (
+        <div className="toast">
+          <span>{toastMessage}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function HistoryCheckTestViewer({ record }: { record: any }) {
+  const diagGradeMap: Record<GradeLevel, string> = {
+    elementary: '초등학교',
+    middle: '중학교',
+    high: '고등학교'
+  };
+
+  return (
+    <div className="diagnosis-container" style={{ marginTop: 0 }}>
+      <div className="diagnosis-card" style={{ border: 'none', boxShadow: 'none', width: '100%', padding: '1rem' }}>
+        <div className="diagnosis-header">
+          <span className="diagnosis-title">📋 취약 개념 분석서 (저장 기록)</span>
+          <span className="diagnosis-score-badge">
+            맞힌 개수: {record.score} / {record.totalQuestions}
+          </span>
+        </div>
+
+        <div className="diagnosis-section">
+          <div className="diagnosis-section-title">🔴 보완이 시급한 취약 세부 개념</div>
+          <div className="diagnosis-concepts-list">
+            {record.weakConcepts && record.weakConcepts.length > 0 ? (
+              record.weakConcepts.map((concept: string, idx: number) => (
+                <span key={idx} className="diagnosis-concept-tag">{concept}</span>
+              ))
+            ) : (
+              <span className="diagnosis-concept-tag" style={{ backgroundColor: 'var(--color-easy-bg)', color: 'var(--color-easy)', borderColor: 'var(--color-easy-border)' }}>취약 개념 없음(완벽 이해)</span>
+            )}
+          </div>
+        </div>
+
+        <div className="diagnosis-section">
+          <div className="diagnosis-section-title">🧠 학생의 예상 인지 오류 (오개념)</div>
+          <p className="diagnosis-text"><MathText text={record.misconceptions || ''} /></p>
+        </div>
+
+        <div className="diagnosis-section">
+          <div className="diagnosis-section-title">📌 추가 학습 보충이 필요한 이유</div>
+          <p className="diagnosis-text"><MathText text={record.feedback || ''} /></p>
+        </div>
+
+        <div className="diagnosis-section" style={{ marginTop: '1.5rem', borderTop: '1px dashed var(--border)', paddingTop: '1.5rem' }}>
+          <div className="diagnosis-section-title">📋 출제 당시 기준 정보</div>
+          <table className="diagnosis-recommendation-table">
+            <tbody>
+              <tr>
+                <td className="label" style={{ width: '30%' }}>학교급 / 학년 / 학기</td>
+                <td>
+                  {diagGradeMap[record.schoolLevel as GradeLevel || 'elementary']} / {record.grade} / {record.semester}
+                </td>
+              </tr>
+              <tr>
+                <td className="label">단원명</td>
+                <td>{record.unit}</td>
+              </tr>
+              <tr>
+                <td className="label">세부 수학 개념</td>
+                <td>{record.concepts}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   // --- Active Tab State ('direct' = 수동 출제, 'diagnosis' = 체크테스트 진단) ---
   const [activeTab, setActiveTab] = useState<'direct' | 'diagnosis'>('diagnosis');
@@ -511,6 +882,20 @@ function App() {
   const [studentGrade, setStudentGrade] = useState('');
   const [studentNum, setStudentNum] = useState('');
   const [studentName, setStudentName] = useState('');
+
+  // --- Firebase / History States ---
+  const [isSavingAssessment, setIsSavingAssessment] = useState(false);
+  const [isSavingCheckTest, setIsSavingCheckTest] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [historyAssessments, setHistoryAssessments] = useState<any[]>([]);
+  const [historyCheckTests, setHistoryCheckTests] = useState<any[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [selectedHistoryRecord, setSelectedHistoryRecord] = useState<any | null>(null);
+  const [showHistoryDetailModal, setShowHistoryDetailModal] = useState(false);
+
+  // Checktest additional states for grade/semester selection
+  const [diagGrade, setDiagGrade] = useState('1학년');
+  const [diagSemester, setDiagSemester] = useState('2학기');
 
   // --- Validation ---
   const difficultySum = difficulty.easy + difficulty.medium + difficulty.hard;
@@ -638,16 +1023,28 @@ function App() {
   // Auto-fill templates for Checking Test grade changes
   const handleDiagGradeChange = (level: GradeLevel) => {
     setDiagGradeLevel(level);
+    
+    let defaultGrade = '';
+    let defaultSemester = '1학기';
+    
     if (level === 'elementary') {
+      defaultGrade = '1학년';
+      defaultSemester = '2학기';
       setDiagUnitName('분수의 덧셈과 뺄셈');
       setDiagConcepts('동분모 분수의 덧셈, 대분수 변환, 받아올림');
     } else if (level === 'middle') {
+      defaultGrade = '1학년';
+      defaultSemester = '1학기';
       setDiagUnitName('소인수분해');
       setDiagConcepts('소인수, 약수의 개수, 최대공약수, 서로소');
     } else {
+      defaultGrade = '공통수학';
+      defaultSemester = '1학기';
       setDiagUnitName('다항식의 연산과 나머지정리');
       setDiagConcepts('다항식의 전개, 곱셈 공식의 변형, 나머지 정리 증명, 3차식 나눗셈');
     }
+    setDiagGrade(defaultGrade);
+    setDiagSemester(defaultSemester);
   };
 
   // Handle auto-balancing ratios
@@ -977,6 +1374,202 @@ interface GPTResponse {
     window.print();
   };
 
+  // --- Firebase Firestore Actions ---
+
+  // Helper to recursively find undefined fields inside an object
+  const findUndefinedFields = (obj: any, path = ''): string[] => {
+    const undefinedFields: string[] = [];
+    if (obj === undefined) {
+      undefinedFields.push(path || 'root');
+      return undefinedFields;
+    }
+    if (obj === null) return undefinedFields;
+    
+    if (Array.isArray(obj)) {
+      obj.forEach((item, idx) => {
+        undefinedFields.push(...findUndefinedFields(item, `${path}[${idx}]`));
+      });
+    } else if (typeof obj === 'object') {
+      for (const key in obj) {
+        if (Object.prototype.hasOwnProperty.call(obj, key)) {
+          const currentPath = path ? `${path}.${key}` : key;
+          const val = obj[key];
+          if (val === undefined) {
+            undefinedFields.push(currentPath);
+          } else {
+            undefinedFields.push(...findUndefinedFields(val, currentPath));
+          }
+        }
+      }
+    }
+    return undefinedFields;
+  };
+
+  // Helper to sanitize data for Firestore (convert undefined fields recursively)
+  const sanitizeForFirestore = (val: any): any => {
+    if (val === undefined) return null;
+    if (val === null) return null;
+    
+    if (Array.isArray(val)) {
+      return val.map(item => sanitizeForFirestore(item));
+    }
+    
+    if (typeof val === 'object') {
+      const clean: any = {};
+      for (const key in val) {
+        if (Object.prototype.hasOwnProperty.call(val, key)) {
+          const v = val[key];
+          if (v === undefined) {
+            clean[key] = null;
+          } else {
+            clean[key] = sanitizeForFirestore(v);
+          }
+        }
+      }
+      return clean;
+    }
+    
+    return val;
+  };
+
+  const handleSaveAssessment = async () => {
+    if (!db) {
+      alert('Firebase 환경변수가 설정되지 않았습니다.');
+      triggerToast('⚠️ Firebase 환경변수가 설정되지 않았습니다.');
+      return;
+    }
+    if (!generatedExam) return;
+    setIsSavingAssessment(true);
+    
+    const rawData = {
+      schoolLevel: gradeLevel || '',
+      grade: selectedGrade || '',
+      semester: selectedSemester || '',
+      unit: unitName || '',
+      concepts: concepts || '',
+      achievementStandard: standard || '',
+      purpose: purpose || '',
+      difficultyRatio: {
+        easy: difficulty.easy ?? 0,
+        medium: difficulty.medium ?? 0,
+        hard: difficulty.hard ?? 0
+      },
+      questionTypeRatio: {
+        choice: questionTypeRatio.choice ?? 0,
+        short: questionTypeRatio.short ?? 0,
+        essay: questionTypeRatio.essay ?? 0
+      },
+      assessmentResult: generatedExam,
+      createdAt: new Date().toISOString()
+    };
+
+    console.log('Saving Assessment Data:', rawData);
+    const sanitizedData = sanitizeForFirestore(rawData);
+    console.log('Sanitized Assessment Data:', sanitizedData);
+
+    try {
+      await addDoc(collection(db, 'assessments'), sanitizedData);
+      triggerToast('💾 저장되었습니다.');
+    } catch (error) {
+      console.error(error);
+      const undefinedPaths = findUndefinedFields(rawData);
+      let errMsg = `저장 실패: ${error instanceof Error ? error.message : String(error)}`;
+      if (undefinedPaths.length > 0) {
+        errMsg += `\n(누락된 필드: ${undefinedPaths.join(', ')})`;
+      }
+      alert(errMsg);
+      triggerToast(errMsg);
+    } finally {
+      setIsSavingAssessment(false);
+    }
+  };
+
+  const handleSaveCheckTest = async () => {
+    if (!db) {
+      alert('Firebase 환경변수가 설정되지 않았습니다.');
+      triggerToast('⚠️ Firebase 환경변수가 설정되지 않았습니다.');
+      return;
+    }
+    if (!diagnosisResult || !checkTest) return;
+    setIsSavingCheckTest(true);
+
+    const rawData = {
+      schoolLevel: diagGradeLevel || '',
+      grade: diagGrade || '',
+      semester: diagSemester || '',
+      unit: diagUnitName || '',
+      concepts: diagConcepts || '',
+      score: diagnosisResult.correctCount ?? 0,
+      totalQuestions: checkTest.questions.length ?? 0,
+      weakConcepts: diagnosisResult.weakConcepts || [],
+      misconceptions: diagnosisResult.expectedMisconceptions || '',
+      feedback: diagnosisResult.reasonForReinforcement || '',
+      createdAt: new Date().toISOString()
+    };
+
+    console.log('Saving Checktest Data:', rawData);
+    const sanitizedData = sanitizeForFirestore(rawData);
+    console.log('Sanitized Checktest Data:', sanitizedData);
+
+    try {
+      await addDoc(collection(db, 'checkTestResults'), sanitizedData);
+      triggerToast('💾 저장되었습니다.');
+    } catch (error) {
+      console.error(error);
+      const undefinedPaths = findUndefinedFields(rawData);
+      let errMsg = `저장 실패: ${error instanceof Error ? error.message : String(error)}`;
+      if (undefinedPaths.length > 0) {
+        errMsg += `\n(누락된 필드: ${undefinedPaths.join(', ')})`;
+      }
+      alert(errMsg);
+      triggerToast(errMsg);
+    } finally {
+      setIsSavingCheckTest(false);
+    }
+  };
+
+  const handleFetchHistory = async () => {
+    if (!db) {
+      alert('Firebase 환경변수가 설정되지 않았습니다.');
+      triggerToast('⚠️ Firebase 환경변수가 설정되지 않았습니다.');
+      return;
+    }
+    setIsLoadingHistory(true);
+    setShowHistoryModal(true);
+    try {
+      const assessmentsRef = collection(db, 'assessments');
+      const checkTestsRef = collection(db, 'checkTestResults');
+      
+      const qAssessments = query(assessmentsRef, orderBy('createdAt', 'desc'), limit(10));
+      const qCheckTests = query(checkTestsRef, orderBy('createdAt', 'desc'), limit(10));
+      
+      const [assessmentsSnap, checkTestsSnap] = await Promise.all([
+        getDocs(qAssessments),
+        getDocs(qCheckTests)
+      ]);
+      
+      const assessmentsList = assessmentsSnap.docs.map(doc => ({
+        id: doc.id,
+        type: 'assessment',
+        ...doc.data()
+      }));
+      
+      const checkTestsList = checkTestsSnap.docs.map(doc => ({
+        id: doc.id,
+        type: 'checktest',
+        ...doc.data()
+      }));
+      
+      setHistoryAssessments(assessmentsList);
+      setHistoryCheckTests(checkTestsList);
+    } catch (error) {
+      console.error(error);
+      triggerToast(`❌ 기록 로드 실패: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
   const stepsText = [
     '교육과정 성취기준 및 단원 핵심요소 분석 중...',
     '교수평가 오개념 빅데이터 대조 및 문제설계 중...',
@@ -1002,6 +1595,13 @@ interface GPTResponse {
           수학 교육과정 성취기준과 오개념 빅데이터에 근거하여, 교사 및 예비교사를 위한 최적의 수학 단원평가 문항과 교수학습 처방 해설지를 맞춤 설계해 드립니다.
         </p>
       </header>
+
+      {/* Firebase Warning Banner */}
+      {!isFirebaseConfigured && (
+        <div className="firebase-warning-banner">
+          ⚠️ Firebase 환경변수가 설정되지 않았습니다.
+        </div>
+      )}
 
       {/* Mode Switcher Tabs */}
       <div className="mode-tabs-container">
@@ -1532,6 +2132,14 @@ interface GPTResponse {
                     </button>
                     <button
                       type="button"
+                      className="btn-utility"
+                      onClick={handleSaveAssessment}
+                      disabled={isSavingAssessment}
+                    >
+                      💾 {isSavingAssessment ? '저장 중...' : '단원평가 저장하기'}
+                    </button>
+                    <button
+                      type="button"
                       className="btn-utility primary"
                       onClick={handlePrint}
                     >
@@ -1575,7 +2183,28 @@ interface GPTResponse {
               )}
 
               {!isGenerating && generatedExam && (
-                <article className={`exam-worksheet ${viewMode === 'student' ? 'student-view' : 'teacher-view'}`}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', width: '100%', maxWidth: '800px', margin: '0 auto' }}>
+                  {/* Save Button Row */}
+                  <div className="no-print" style={{ display: 'flex', justifyContent: 'center' }}>
+                    <button
+                      type="button"
+                      className="btn-generate"
+                      style={{
+                        width: '100%',
+                        background: 'linear-gradient(135deg, var(--primary), hsl(var(--hue), 85%, 65%))',
+                        padding: '0.85rem 1.5rem',
+                        fontSize: '1rem',
+                        fontWeight: 600,
+                        boxShadow: 'var(--shadow-md)'
+                      }}
+                      onClick={handleSaveAssessment}
+                      disabled={isSavingAssessment}
+                    >
+                      💾 {isSavingAssessment ? '단원평가 저장 중...' : '단원평가 저장하기'}
+                    </button>
+                  </div>
+                  
+                  <article className={`exam-worksheet ${viewMode === 'student' ? 'student-view' : 'teacher-view'}`} style={{ marginTop: 0 }}>
                   
                   {/* Meta Paper Title */}
                   <div className="exam-meta-header">
@@ -1741,6 +2370,7 @@ interface GPTResponse {
                   )}
                   
                 </article>
+                </div>
               )}
               
             </div>
@@ -1785,6 +2415,46 @@ interface GPTResponse {
                   >
                     🏛️ 고등학교
                   </button>
+                </div>
+              </div>
+
+              {/* Diag Grade/Subject Selection */}
+              <div className="form-group">
+                <label className="form-label">
+                  학년/과목 선택 <span className="form-label-help">* 필수 선택</span>
+                </label>
+                <div className="curriculum-selector-grid">
+                  {(GRADE_OPTIONS[diagGradeLevel] || []).map((grade) => (
+                    <button
+                      key={grade}
+                      type="button"
+                      className={`recommend-unit-btn ${diagGrade === grade ? 'active' : ''}`}
+                      onClick={() => setDiagGrade(grade)}
+                      style={{ justifyContent: 'center', textAlign: 'center', padding: '0.5rem 0.25rem', fontSize: '0.85rem' }}
+                    >
+                      {grade}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Diag Semester Selection */}
+              <div className="form-group">
+                <label className="form-label">
+                  학기 선택 <span className="form-label-help">* 필수 선택</span>
+                </label>
+                <div className="grade-pills">
+                  {['1학기', '2학기'].map((sem) => (
+                    <button
+                      key={sem}
+                      type="button"
+                      className={`grade-pill-btn ${diagSemester === sem ? 'active' : ''}`}
+                      onClick={() => setDiagSemester(sem)}
+                    >
+                      {sem}
+                    </button>
+                  ))}
+                  <div style={{ visibility: 'hidden' }}></div>
                 </div>
               </div>
 
@@ -2052,14 +2722,31 @@ interface GPTResponse {
                               </table>
                             </div>
 
-                            {/* Glow-pulse Auto Transfer Button */}
-                            <button
-                              type="button"
-                              className="btn-apply-diagnosis"
-                              onClick={handleApplyDiagnosis}
-                            >
-                              ⚡ 진단 결과로 출제 조건 적용하기
-                            </button>
+                            {/* Actions Group */}
+                            <div style={{ display: 'flex', gap: '1rem', marginTop: '1.25rem', flexWrap: 'wrap' }}>
+                              <button
+                                type="button"
+                                className="btn-apply-diagnosis"
+                                onClick={handleApplyDiagnosis}
+                                style={{ flex: 1, minWidth: '200px' }}
+                              >
+                                ⚡ 진단 결과로 출제 조건 적용하기
+                              </button>
+                              <button
+                                type="button"
+                                className="btn-apply-diagnosis"
+                                style={{
+                                  flex: 1,
+                                  minWidth: '200px',
+                                  background: 'linear-gradient(135deg, var(--color-easy), hsl(142, 68%, 55%))',
+                                  boxShadow: '0 8px 24px -4px rgba(34, 197, 94, 0.25)'
+                                }}
+                                onClick={handleSaveCheckTest}
+                                disabled={isSavingCheckTest}
+                              >
+                                💾 {isSavingCheckTest ? '저장 중...' : '체크테스트 결과 저장하기'}
+                              </button>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -2092,6 +2779,169 @@ interface GPTResponse {
       {showToast && (
         <div className="toast">
           <span>{toastMessage}</span>
+        </div>
+      )}
+
+      {/* History Trigger Footer */}
+      <div className="history-trigger-container">
+        <button
+          type="button"
+          className="btn-history-trigger"
+          onClick={handleFetchHistory}
+        >
+          📋 저장된 기록 보기
+        </button>
+      </div>
+
+      {/* History Records List Modal */}
+      {showHistoryModal && (
+        <div className="history-modal-overlay" onClick={() => setShowHistoryModal(false)}>
+          <div className="history-modal-content" style={{ maxWidth: '1000px' }} onClick={(e) => e.stopPropagation()}>
+            <div className="history-modal-header">
+              <h3 className="history-modal-title">📋 최근 저장된 기록</h3>
+              <button className="history-modal-close" onClick={() => setShowHistoryModal(false)}>×</button>
+            </div>
+            <div className="history-modal-body">
+              {isLoadingHistory ? (
+                <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem' }}>
+                  <div className="math-ripple-loader">
+                    <div></div>
+                    <div></div>
+                  </div>
+                </div>
+              ) : (historyAssessments.length === 0 && historyCheckTests.length === 0) ? (
+                <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                  저장된 기록이 없습니다.
+                </div>
+              ) : (
+                <div className="history-records-grid">
+                  {/* Left Column: Assessments */}
+                  <div className="history-records-column">
+                    <h4 className="history-column-title">📄 단원평가 기록 (최근 10개)</h4>
+                    {historyAssessments.length === 0 ? (
+                      <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', border: '1px dashed var(--border)', borderRadius: 'var(--radius-sm)' }}>
+                        저장된 단원평가가 없습니다.
+                      </div>
+                    ) : (
+                      <div className="history-records-list">
+                        {historyAssessments.map((record) => {
+                          const dateStr = new Date(record.createdAt).toLocaleString('ko-KR', {
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          });
+                          const levelKo = record.schoolLevel === 'elementary' ? '초등' : record.schoolLevel === 'middle' ? '중등' : '고등';
+                          return (
+                            <div
+                              key={record.id}
+                              className="history-record-card"
+                              onClick={() => {
+                                setSelectedHistoryRecord(record);
+                                setShowHistoryDetailModal(true);
+                              }}
+                            >
+                              <div className="history-record-info">
+                                <div className="history-record-meta">
+                                  <span className="history-type-badge assessment">단원평가</span>
+                                  <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                                    {levelKo} | {record.grade} {record.semester}
+                                  </span>
+                                </div>
+                                <div className="history-record-unit">{record.unit}</div>
+                                <div className="history-record-details-row">
+                                  <span>개념: {record.concepts}</span>
+                                </div>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <span className="history-record-date">{dateStr}</span>
+                                <span className="history-record-action-arrow">➔</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Right Column: Checktests */}
+                  <div className="history-records-column">
+                    <h4 className="history-column-title">🧪 체크테스트 기록 (최근 10개)</h4>
+                    {historyCheckTests.length === 0 ? (
+                      <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', border: '1px dashed var(--border)', borderRadius: 'var(--radius-sm)' }}>
+                        저장된 체크테스트 결과가 없습니다.
+                      </div>
+                    ) : (
+                      <div className="history-records-list">
+                        {historyCheckTests.map((record) => {
+                          const dateStr = new Date(record.createdAt).toLocaleString('ko-KR', {
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          });
+                          const levelKo = record.schoolLevel === 'elementary' ? '초등' : record.schoolLevel === 'middle' ? '중등' : '고등';
+                          return (
+                            <div
+                              key={record.id}
+                              className="history-record-card"
+                              onClick={() => {
+                                setSelectedHistoryRecord(record);
+                                setShowHistoryDetailModal(true);
+                              }}
+                            >
+                              <div className="history-record-info">
+                                <div className="history-record-meta">
+                                  <span className="history-type-badge checktest">체크테스트</span>
+                                  <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                                    {levelKo} | {record.grade} {record.semester}
+                                  </span>
+                                </div>
+                                <div className="history-record-unit">{record.unit}</div>
+                                <div className="history-record-details-row">
+                                  <span>개념: {record.concepts}</span>
+                                  <span style={{ color: 'var(--primary)', fontWeight: 600 }}>
+                                    점수: {record.score} / {record.totalQuestions}
+                                  </span>
+                                </div>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <span className="history-record-date">{dateStr}</span>
+                                <span className="history-record-action-arrow">➔</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* History Details Viewer Modal */}
+      {showHistoryDetailModal && selectedHistoryRecord && (
+        <div className="history-modal-overlay" onClick={() => setShowHistoryDetailModal(false)}>
+          <div className="detail-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="history-modal-header">
+              <h3 className="history-modal-title">
+                {selectedHistoryRecord.type === 'assessment' ? '📄 저장된 단원평가 상세' : '📊 저장된 체크테스트 결과 상세'}
+              </h3>
+              <button className="history-modal-close" onClick={() => setShowHistoryDetailModal(false)}>×</button>
+            </div>
+            <div className="detail-modal-body">
+              {selectedHistoryRecord.type === 'assessment' ? (
+                <HistoryAssessmentViewer exam={selectedHistoryRecord.assessmentResult} />
+              ) : (
+                <HistoryCheckTestViewer record={selectedHistoryRecord} />
+              )}
+            </div>
+          </div>
         </div>
       )}
     </>

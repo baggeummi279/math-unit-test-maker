@@ -101,14 +101,49 @@ OpenAI API를 안전하게 사용하기 위해 프로젝트 루트 디렉토리�
 1. **Vercel 연동**: Vercel에 가입하고 본 프로젝트의 GitHub 저장소를 가져와 연동합니다.
 2. **환경변수 설정 (Environment Variables)**:
    - Vercel의 프로젝트 설정(Project Settings) -> **Environment Variables** 메뉴로 이동합니다.
-   - Key에 `OPENAI_API_KEY`, Value에 발급받은 실제 OpenAI API Key를 등록하고 저장합니다.
+   - 다음 환경변수 키와 값을 등록하고 저장합니다:
+     - `OPENAI_API_KEY`: 발급받은 실제 OpenAI API Key
+     - `VITE_FIREBASE_API_KEY`: Firebase 웹 앱 API Key
+     - `VITE_FIREBASE_AUTH_DOMAIN`: Firebase Auth Domain
+     - `VITE_FIREBASE_PROJECT_ID`: Firebase Project ID
+     - `VITE_FIREBASE_STORAGE_BUCKET`: Firebase Storage Bucket
+     - `VITE_FIREBASE_MESSAGING_SENDER_ID`: Firebase Messaging Sender ID
+     - `VITE_FIREBASE_APP_ID`: Firebase App ID
+   - *참고: 클라이언트 사이드에서 Firebase SDK가 직접 접근해야 하므로, Firebase 변수들은 반드시 `VITE_` 접두사를 포함해야 합니다.*
 3. **빌드 설정 검증**:
    - Vercel의 Auto-detection에 의해 Vite 빌드 환경(`Build Command: npm run build`, `Output Directory: dist`)이 자동으로 셋업됩니다.
    - 저장소를 메인 브랜치에 Push하면 서버리스 API 함수들(`/api/*`)과 정적 웹 에셋이 완벽한 시너지를 내며 글로벌 상용 배포가 완료됩니다.
 
 ---
 
-## 🔮 7. 향후 보완 및 고도화할 점 (Future Roadmap)
+## 🔒 7. Firestore 보안 규칙 설정 (Security Rules)
+본 프로젝트는 초기 단계로 Firebase Authentication을 연동하지 않고 Firestore 데이터베이스만 사용하므로, 외부에서 체크테스트 결과 및 생성된 단원평가를 저장하고 조회할 수 있도록 규칙을 구성해야 합니다.
+
+Firebase Console의 Firestore Database -> **규칙(Rules)** 탭에서 아래와 같이 보안 규칙을 적용해 주세요.
+
+```javascript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 단원평가 저장소 컬렉션 규칙
+    match /assessments/{document} {
+      allow read, write: if true;
+    }
+    // 사전 체크테스트 결과 저장소 컬렉션 규칙
+    match /checkTestResults/{document} {
+      allow read, write: if true;
+    }
+  }
+}
+```
+
+> ⚠️ **보안 경고 (Security Caution)**
+> - 위 규칙은 테스트 및 프로토타입 검증용입니다. 인증되지 않은 누구나 데이터를 읽고 쓸 수 있으므로 실제 서비스 배포 시에는 Firebase Authentication을 연동하여 소유자만 쓰기/읽기가 가능하도록 보안 규칙을 고도화해야 합니다.
+
+---
+
+## 🔮 8. 향후 보완 및 고도화할 점 (Future Roadmap)
 - **과도한 생성 비용 통제 (Redis Caching)**: 동일 단원/성취기준에 대한 중복 생성 요청을 캐싱하여 토큰 비용을 대폭 아끼고 응답 속도를 비약적으로 단축할 수 있는 레이어 결합.
 - **수학 기하 도형 렌더러 (SVG/Canvas Engine)**: 수학 단원에서 필수적인 삼각형, 원, 일차/이차함수의 좌표를 JSON으로 분석하여 문제 지문 내에 정확한 반응형 SVG 도형으로 그려주는 시각 기능 구현.
 - **고등 특수 기호 융합 레이어**: 행렬식, 다중적분 기호 등 텍스트 표현에 한계가 있는 초고난도 기호에 한해서만 국소적으로 최적화된 KaTeX 레이어를 플러그인 형태로 안전하게 결합하는 아키텍처 확장.
+

@@ -1682,4 +1682,297 @@ body {
   font-weight: 600;
 }
 
+/* Firebase Integration Styles */
+
+/* Warning Banner for missing firebase configs */
+.firebase-warning-banner {
+  background-color: var(--color-hard-bg);
+  border: 1px solid var(--color-hard-border);
+  color: var(--color-hard);
+  padding: 0.75rem 1.25rem;
+  border-radius: var(--radius-sm);
+  margin: 1rem 1.5rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  animation: fadeInDown 0.4s ease-out;
+}
+
+/* History buttons styling */
+.history-trigger-container {
+  display: flex;
+  justify-content: center;
+  padding: 1.5rem;
+  border-top: 1px solid var(--border);
+  margin-top: 1.5rem;
+  background-color: var(--bg-panel);
+}
+
+.btn-history-trigger {
+  font-family: var(--font-sans);
+  background-color: var(--bg-panel);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  padding: 0.75rem 1.5rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: var(--transition);
+  outline: none;
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-history-trigger:hover {
+  background-color: var(--bg-input);
+  color: var(--text-primary);
+  border-color: var(--primary);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+/* Modal overlays (Glassmorphism Modal) */
+.history-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.history-modal-content {
+  background-color: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  width: 90%;
+  max-width: 800px;
+  max-height: 85vh;
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: scaleUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.history-modal-header {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  background-color: hsla(var(--hue), 20%, 50%, 0.02);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.history-modal-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.history-modal-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.history-modal-close:hover {
+  color: var(--text-primary);
+}
+
+.history-modal-body {
+  padding: 1.5rem;
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* History Record List items */
+.history-records-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.history-record-card {
+  background-color: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 1.25rem;
+  cursor: pointer;
+  transition: var(--transition);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.history-record-card:hover {
+  border-color: var(--primary);
+  background-color: var(--bg-panel);
+  transform: translateX(4px);
+  box-shadow: var(--shadow-sm);
+}
+
+.history-record-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.history-record-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.history-type-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.2rem 0.6rem;
+  border-radius: 12px;
+  text-align: center;
+}
+
+.history-type-badge.assessment {
+  background-color: var(--primary-glow);
+  color: var(--primary);
+  border: 1px solid var(--primary);
+}
+
+.history-type-badge.checktest {
+  background-color: var(--color-medium-bg);
+  color: var(--color-medium);
+  border: 1px solid var(--color-medium-border);
+}
+
+.history-record-unit {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 1.05rem;
+}
+
+.history-record-details-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.history-record-date {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.history-record-action-arrow {
+  color: var(--text-muted);
+  font-size: 1.25rem;
+  transition: var(--transition);
+}
+
+.history-record-card:hover .history-record-action-arrow {
+  color: var(--primary);
+  transform: translateX(2px);
+}
+
+/* History Details Viewer Modal */
+.detail-modal-content {
+  background-color: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  width: 95%;
+  max-width: 900px;
+  max-height: 90vh;
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: scaleUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.detail-modal-body {
+  padding: 1.5rem;
+  overflow-y: auto;
+  flex: 1;
+  background-color: var(--bg-app);
+}
+
+/* Animation utilities */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleUp {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+@keyframes fadeInDown {
+  from { transform: translateY(-10px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* Print Helper to hide elements when generating PDF/printing */
+@media print {
+  .no-print,
+  .history-trigger-container,
+  .history-modal-overlay {
+    display: none !important;
+  }
+}
+
+/* History Modal Two-Column Layout */
+.history-records-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+@media (max-width: 768px) {
+  .history-records-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.history-records-column {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.history-column-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--primary);
+  border-bottom: 2px solid var(--border);
+  padding-bottom: 0.5rem;
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+
 
